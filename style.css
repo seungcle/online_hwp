@@ -207,3 +207,36 @@ html, body {
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── 푸터 ── */
+.landing-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  text-align: center;
+  font-size: 0.8rem;
+  border-top: 1px solid #e2e8f0;
+  background: #f1f5f9;
+}
+
+.landing-footer a {
+  color: #94a3b8;
+  text-decoration: none;
+}
+
+.landing-footer a:hover {
+  color: #64748b;
+  text-decoration: underline;
+}
+
+.landing-footer a {
+  color: #94a3b8;
+  text-decoration: none;
+}
+
+.landing-footer a:hover {
+  color: #64748b;
+  text-decoration: underline;
+}
