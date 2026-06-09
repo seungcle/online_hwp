@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HWP 온라인 편집기</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+  <!-- 랜딩: 파일이 없을 때 -->
+  <div id="landing">
+    <div class="landing-inner">
+      <div class="logo">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <rect width="48" height="48" rx="12" fill="#2563EB"/>
+          <text x="50%" y="56%" dominant-baseline="middle" text-anchor="middle"
+                font-family="sans-serif" font-weight="700" font-size="20" fill="white">HWP</text>
+        </svg>
+        <h1>HWP 온라인 편집기</h1>
+      </div>
+      <p class="subtitle">HWP / HWPX 파일을 브라우저에서 바로 편집하세요</p>
+
+      <div id="drop-zone" class="drop-zone">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 16V8m0 0L9 11m3-3l3 3"/>
+          <path d="M20.25 14.25v3a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 17.25v-3"/>
+        </svg>
+        <p>파일을 여기에 끌어다 놓거나</p>
+        <label class="btn-open" for="file-input">파일 선택</label>
+        <p class="hint">.hwp, .hwpx 파일 지원</p>
+      </div>
+
+      <input type="file" id="file-input" accept=".hwp,.hwpx" hidden />
+    </div>
+  </div>
+
+  <!-- 편집기 영역: 파일 로드 후 -->
+  <div id="editor-wrap" hidden>
+    <header id="topbar">
+      <div class="topbar-left">
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none" style="flex-shrink:0">
+          <rect width="48" height="48" rx="10" fill="#2563EB"/>
+          <text x="50%" y="56%" dominant-baseline="middle" text-anchor="middle"
+                font-family="sans-serif" font-weight="700" font-size="16" fill="white">HWP</text>
+        </svg>
+        <span id="file-name" class="file-name">문서</span>
+      </div>
+      <div class="topbar-right">
+        <button id="btn-new" class="topbar-btn" title="새 문서">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+          새 문서
+        </button>
+        <label class="topbar-btn" for="file-input-replace" title="파일 열기">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+          </svg>
+          열기
+        </label>
+        <input type="file" id="file-input-replace" accept=".hwp,.hwpx" hidden />
+        <button id="btn-save" class="topbar-btn btn-primary" title="HWP로 저장">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          저장
+        </button>
+      </div>
+    </header>
+    <div id="editor-container"></div>
+  </div>
+
+  <!-- 로딩 오버레이 -->
+  <div id="loading" hidden>
+    <div class="spinner"></div>
+    <p id="loading-msg">파일을 불러오는 중...</p>
+  </div>
+
+  <script type="module" src="/main.js"></script>
+</body>
+</html>
