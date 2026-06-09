@@ -11,6 +11,6 @@
     "@rhwp/editor": "^0.7.15"
   },
   "devDependencies": {
-    "vite": "^5.0.0"
+    "vite": "^6.0.0"
   }
 }
