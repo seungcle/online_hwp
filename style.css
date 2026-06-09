@@ -208,6 +208,137 @@ html, body {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Google Drive 버튼 ── */
+.open-options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.open-or {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.btn-drive {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-drive:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+/* ── Drive 모달 ── */
+#drive-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.drive-modal-box {
+  background: white;
+  border-radius: 16px;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.drive-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.drive-modal-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.drive-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 4px 8px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.drive-close-btn:hover { color: #475569; background: #f1f5f9; }
+
+.drive-file-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px;
+}
+
+.drive-status {
+  padding: 24px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.drive-error { color: #ef4444; }
+
+.drive-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.drive-file-item:hover { background: #f1f5f9; }
+
+.drive-file-name {
+  font-size: 0.9rem;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.drive-file-date {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
 /* ── 푸터 ── */
 .landing-footer {
   position: fixed;
