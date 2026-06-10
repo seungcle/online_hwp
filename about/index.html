@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>서비스 소개 – HWP 온라인 편집기</title>
+  <meta name="description" content="HWP 온라인 편집기 서비스 소개. 설치 없이 브라우저에서 HWP 파일을 편집할 수 있는 무료 웹 서비스입니다." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; }
+    nav { background: white; border-bottom: 1px solid #e2e8f0; padding: 0 24px; height: 48px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { font-size: 0.95rem; font-weight: 700; color: #0f172a; text-decoration: none; }
+    .nav-links { display: flex; gap: 20px; }
+    .nav-links a { font-size: 0.85rem; color: #64748b; text-decoration: none; }
+    .nav-links a:hover { color: #2563EB; }
+    .container { max-width: 720px; margin: 40px auto; padding: 0 16px 60px; }
+    .wrap { background: white; border-radius: 16px; padding: 48px; }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
+    .lead { font-size: 0.95rem; color: #64748b; margin-bottom: 40px; }
+    h2 { font-size: 1rem; font-weight: 700; margin: 32px 0 12px; color: #0f172a; }
+    p { font-size: 0.95rem; line-height: 1.8; color: #334155; }
+    .features { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    .feature-card { background: #f8fafc; border-radius: 12px; padding: 20px; }
+    .feature-icon { font-size: 1.5rem; margin-bottom: 8px; }
+    .feature-title { font-size: 0.9rem; font-weight: 600; color: #0f172a; margin-bottom: 4px; }
+    .feature-desc { font-size: 0.85rem; color: #64748b; line-height: 1.6; }
+    a { color: #2563EB; }
+    .cta { display: inline-block; margin-top: 32px; padding: 12px 32px; background: #2563EB; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.95rem; }
+    .cta:hover { background: #1d4ed8; }
+    footer { text-align: center; padding: 24px; font-size: 0.8rem; }
+    footer a { color: #94a3b8; text-decoration: none; margin: 0 8px; }
+    footer a:hover { color: #64748b; }
+    @media (max-width: 480px) { .features { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="nav-logo">HWP 온라인 편집기</a>
+    <div class="nav-links">
+      <a href="/guide/">사용 가이드</a>
+      <a href="/faq/">자주 묻는 질문</a>
+      <a href="/about/">서비스 소개</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="wrap">
+      <h1>서비스 소개</h1>
+      <p class="lead">HWP 온라인 편집기는 한글(HWP) 문서를 설치 없이 브라우저에서 바로 편집할 수 있는 무료 웹 서비스입니다.</p>
+
+      <h2>왜 만들었나요?</h2>
+      <p>HWP 파일은 국내에서 가장 널리 사용되는 문서 형식 중 하나지만, 한글과컴퓨터 프로그램 없이는 열기 어렵습니다. macOS, Linux 사용자나 HWP 프로그램이 설치되지 않은 환경에서는 공공기관 서류, 이력서, 계약서 등 HWP 형식의 문서를 편집하는 것이 불편했습니다. 이 서비스는 그런 불편함을 해소하기 위해 만들어졌습니다.</p>
+
+      <h2>주요 특징</h2>
+      <div class="features">
+        <div class="feature-card">
+          <div class="feature-icon">🌐</div>
+          <div class="feature-title">설치 불필요</div>
+          <div class="feature-desc">크롬, 사파리, 엣지 등 브라우저만 있으면 바로 사용할 수 있습니다.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <div class="feature-title">개인정보 보호</div>
+          <div class="feature-desc">파일은 서버로 전송되지 않고 브라우저 내에서만 처리됩니다.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💸</div>
+          <div class="feature-title">완전 무료</div>
+          <div class="feature-desc">회원가입 없이 무료로 사용할 수 있습니다.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📄</div>
+          <div class="feature-title">PDF 내보내기</div>
+          <div class="feature-desc">HWP 파일을 PDF로 변환해 저장할 수 있습니다.</div>
+        </div>
+      </div>
+
+      <h2>지원 형식</h2>
+      <p>HWP (.hwp) 및 HWPX (.hwpx) 형식의 파일을 지원합니다. 편집 후 HWP 형식으로 저장하거나 PDF로 내보낼 수 있습니다.</p>
+
+      <h2>문의</h2>
+      <p>서비스 관련 문의는 <a href="mailto:dkdltmdcks@gmail.com">dkdltmdcks@gmail.com</a>으로 연락해 주세요.</p>
+
+      <a href="/" class="cta">편집기 바로 사용하기</a>
+    </div>
+  </div>
+
+  <footer>
+    <a href="/">홈</a>
+    <a href="/guide/">사용 가이드</a>
+    <a href="/faq/">자주 묻는 질문</a>
+    <a href="/privacy/">개인정보처리방침</a>
+  </footer>
+</body>
+</html>

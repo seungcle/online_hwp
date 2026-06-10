@@ -231,12 +231,7 @@ html, body {
   text-decoration: underline;
 }
 
-.landing-footer a {
-  color: #94a3b8;
-  text-decoration: none;
-}
-
-.landing-footer a:hover {
-  color: #64748b;
-  text-decoration: underline;
+.footer-sep {
+  color: #cbd5e1;
+  margin: 0 2px;
 }
