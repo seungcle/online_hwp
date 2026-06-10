@@ -23,9 +23,14 @@
     .faq-q::before { content: 'Q.'; color: #2563EB; flex-shrink: 0; }
     .faq-a { font-size: 0.95rem; line-height: 1.8; color: #334155; padding-left: 26px; }
     a { color: #2563EB; }
-    footer { text-align: center; padding: 24px; font-size: 0.8rem; }
-    footer a { color: #94a3b8; text-decoration: none; margin: 0 8px; }
-    footer a:hover { color: #64748b; }
+    footer { text-align: center; padding: 32px 24px; }
+    footer hr { border: none; border-top: 1px solid #e2e8f0; margin-bottom: 24px; }
+    .cta { display: inline-block; margin-top: 32px; padding: 12px 32px; background: #2563EB; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.95rem; }
+    .cta:hover { background: #1d4ed8; }
+    .footer-links { font-size: 0.8rem; }
+    .footer-links a { color: #94a3b8; text-decoration: none; margin: 0 6px; }
+    .footer-links a:hover { color: #64748b; }
+    .footer-links span { color: #cbd5e1; }
   </style>
 </head>
 <body>
@@ -77,14 +82,18 @@
         <p class="faq-q">한글(HWP) 프로그램 없이도 사용할 수 있나요?</p>
         <p class="faq-a">네. 한글과컴퓨터의 HWP 프로그램을 설치하지 않아도 브라우저만 있으면 HWP 파일을 열고 편집할 수 있습니다. Windows, macOS, Linux 등 운영체제와 무관하게 사용 가능합니다.</p>
       </div>
+
+      <a href="/" class="cta">편집기 바로 사용하기</a>
     </div>
   </div>
 
   <footer>
-    <a href="/">홈</a>
-    <a href="/guide/">사용 가이드</a>
-    <a href="/about/">서비스 소개</a>
-    <a href="/privacy/">개인정보처리방침</a>
+    <hr />
+    <div class="footer-links">
+      <a href="/guide/">사용 가이드</a><span>·</span>
+      <a href="/about/">서비스 소개</a><span>·</span>
+      <a href="/privacy/">개인정보처리방침</a>
+    </div>
   </footer>
 </body>
 </html>

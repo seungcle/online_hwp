@@ -24,9 +24,14 @@
     li { margin-bottom: 4px; }
     .tip { background: #eff6ff; border-left: 3px solid #2563EB; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-top: 12px; font-size: 0.9rem; color: #1e40af; }
     a { color: #2563EB; }
-    footer { text-align: center; padding: 24px; font-size: 0.8rem; }
-    footer a { color: #94a3b8; text-decoration: none; margin: 0 8px; }
-    footer a:hover { color: #64748b; }
+    footer { text-align: center; padding: 32px 24px; }
+    footer hr { border: none; border-top: 1px solid #e2e8f0; margin-bottom: 24px; }
+    .cta { display: inline-block; margin-top: 32px; padding: 12px 32px; background: #2563EB; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.95rem; }
+    .cta:hover { background: #1d4ed8; }
+    .footer-links { font-size: 0.8rem; }
+    .footer-links a { color: #94a3b8; text-decoration: none; margin: 0 6px; }
+    .footer-links a:hover { color: #64748b; }
+    .footer-links span { color: #cbd5e1; }
   </style>
 </head>
 <body>
@@ -74,14 +79,18 @@
 
       <h2><span class="step-num">5</span> 새 문서 시작</h2>
       <p>상단의 「새 문서」 버튼을 클릭하면 빈 문서로 새 작업을 시작할 수 있습니다.</p>
+
+      <a href="/" class="cta">편집기 바로 사용하기</a>
     </div>
   </div>
 
   <footer>
-    <a href="/">홈</a>
-    <a href="/faq/">자주 묻는 질문</a>
-    <a href="/about/">서비스 소개</a>
-    <a href="/privacy/">개인정보처리방침</a>
+    <hr />
+    <div class="footer-links">
+      <a href="/faq/">자주 묻는 질문</a><span>·</span>
+      <a href="/about/">서비스 소개</a><span>·</span>
+      <a href="/privacy/">개인정보처리방침</a>
+    </div>
   </footer>
 </body>
 </html>

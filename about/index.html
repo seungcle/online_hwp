@@ -27,9 +27,12 @@
     a { color: #2563EB; }
     .cta { display: inline-block; margin-top: 32px; padding: 12px 32px; background: #2563EB; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.95rem; }
     .cta:hover { background: #1d4ed8; }
-    footer { text-align: center; padding: 24px; font-size: 0.8rem; }
-    footer a { color: #94a3b8; text-decoration: none; margin: 0 8px; }
-    footer a:hover { color: #64748b; }
+    footer { text-align: center; padding: 32px 24px; }
+    footer hr { border: none; border-top: 1px solid #e2e8f0; margin-bottom: 24px; }
+    .footer-links { font-size: 0.8rem; }
+    .footer-links a { color: #94a3b8; text-decoration: none; margin: 0 6px; }
+    .footer-links a:hover { color: #64748b; }
+    .footer-links span { color: #cbd5e1; }
     @media (max-width: 480px) { .features { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -86,10 +89,12 @@
   </div>
 
   <footer>
-    <a href="/">홈</a>
-    <a href="/guide/">사용 가이드</a>
-    <a href="/faq/">자주 묻는 질문</a>
-    <a href="/privacy/">개인정보처리방침</a>
+    <hr />
+    <div class="footer-links">
+      <a href="/guide/">사용 가이드</a><span>·</span>
+      <a href="/faq/">자주 묻는 질문</a><span>·</span>
+      <a href="/privacy/">개인정보처리방침</a>
+    </div>
   </footer>
 </body>
 </html>

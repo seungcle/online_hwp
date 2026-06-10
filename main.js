@@ -12,6 +12,7 @@ const btnSave      = document.getElementById('btn-save');
 const btnPdf       = document.getElementById('btn-pdf');
 const btnNew       = document.getElementById('btn-new');
 const dropZone     = document.getElementById('drop-zone');
+const mainNav      = document.getElementById('main-nav');
 
 let editor = null;
 let currentFileName = '';
@@ -41,6 +42,7 @@ async function loadFile(file) {
     currentFileName = file.name;
     fileNameEl.textContent = file.name;
     landing.hidden = true;
+    mainNav.hidden = true;
     editorWrap.hidden = false;
   } catch (err) {
     hideLoading();
@@ -75,6 +77,7 @@ async function newDocument() {
     currentFileName = '새 문서.hwp';
     fileNameEl.textContent = currentFileName;
     landing.hidden = true;
+    mainNav.hidden = true;
     editorWrap.hidden = false;
   } catch (err) {
     alert(`오류: ${err.message}`);
