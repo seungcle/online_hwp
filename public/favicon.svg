@@ -1,4 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-  <rect width="48" height="48" rx="12" fill="#2563EB"/>
-  <text x="50%" y="56%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="20" fill="white">HWP</text>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <!-- 배경 -->
+  <rect width="48" height="48" rx="10" fill="url(#bg)"/>
+  <!-- 문서 몸체 -->
+  <rect x="11" y="6" width="22" height="28" rx="2" fill="white"/>
+  <!-- 접힌 모서리 삼각형 -->
+  <polygon points="25,6 33,6 33,14" fill="#bfdbfe"/>
+  <polygon points="25,6 25,14 33,14" fill="#93c5fd"/>
+  <!-- 텍스트 라인들 -->
+  <rect x="14" y="18" width="13" height="2.2" rx="1.1" fill="#3b82f6" opacity="0.55"/>
+  <rect x="14" y="22.5" width="16" height="2.2" rx="1.1" fill="#3b82f6" opacity="0.4"/>
+  <rect x="14" y="27" width="10" height="2.2" rx="1.1" fill="#3b82f6" opacity="0.4"/>
+  <!-- HWP 뱃지 -->
+  <rect x="9" y="32" width="30" height="11" rx="5.5" fill="#1e40af"/>
+  <text x="24" y="41" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="8.5" fill="white" letter-spacing="1">HWP</text>
 </svg>
