@@ -32,7 +32,6 @@ async function initEditor() {
   if (editor) return;
   showLoading('편집기 초기화 중...');
   editor = await createEditor(editorContainer);
-  hideLoading();
 }
 
 async function loadFile(file) {
@@ -106,6 +105,11 @@ fileInputReplace.addEventListener('change', (e) => {
 
 async function exportPdf() {
   if (!editor) return;
+  const win = window.open('', '_blank');
+  if (!win) {
+    alert('팝업이 차단되었습니다. 브라우저 주소창의 팝업 허용 버튼을 클릭 후 다시 시도해주세요.');
+    return;
+  }
   showLoading('PDF 생성 중...');
   try {
     const count = await editor.pageCount();
@@ -114,7 +118,6 @@ async function exportPdf() {
       svgs.push(await editor.getPageSvg(i));
     }
     hideLoading();
-    const win = window.open('', '_blank');
     win.document.write(
       '<!DOCTYPE html><html><head><style>' +
       '*{margin:0;padding:0;box-sizing:border-box}' +
@@ -130,6 +133,7 @@ async function exportPdf() {
     win.document.close();
   } catch (err) {
     hideLoading();
+    win.close();
     alert(`PDF 내보내기 실패: ${err.message}`);
   }
 }
