@@ -38,29 +38,6 @@
       </div>
 
       <input type="file" id="file-input" accept=".hwp,.hwpx" hidden />
-
-      <div class="open-options">
-        <span class="open-or">또는</span>
-        <button id="btn-drive" class="btn-drive">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M4 18l4-7L4 4h8l4 7-4 7H4z" fill="#4285F4" opacity=".8"/>
-            <path d="M12 4h8l-4 14h-8l4-14z" fill="#34A853" opacity=".8"/>
-            <path d="M4 18h16l-2-3H6l-2 3z" fill="#FBBC04" opacity=".9"/>
-          </svg>
-          Google Drive에서 열기
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Google Drive 파일 선택 모달 -->
-  <div id="drive-modal" hidden>
-    <div class="drive-modal-box">
-      <div class="drive-modal-header">
-        <span class="drive-modal-title">Google Drive</span>
-        <button id="btn-drive-close" class="drive-close-btn">✕</button>
-      </div>
-      <div id="drive-file-list" class="drive-file-list"></div>
     </div>
   </div>
 
@@ -96,6 +73,15 @@
           열기
         </label>
         <input type="file" id="file-input-replace" accept=".hwp,.hwpx" hidden />
+        <button id="btn-pdf" class="topbar-btn" title="PDF로 저장">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+          PDF
+        </button>
         <button id="btn-save" class="topbar-btn btn-primary" title="HWP로 저장">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
