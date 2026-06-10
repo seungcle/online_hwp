@@ -13,6 +13,7 @@ const btnPdf       = document.getElementById('btn-pdf');
 const btnNew       = document.getElementById('btn-new');
 const dropZone     = document.getElementById('drop-zone');
 const mainNav      = document.getElementById('main-nav');
+const landingFooter = document.querySelector('.landing-footer');
 
 let editor = null;
 let currentFileName = '';
@@ -43,6 +44,7 @@ async function loadFile(file) {
     fileNameEl.textContent = file.name;
     landing.hidden = true;
     mainNav.hidden = true;
+    landingFooter.hidden = true;
     editorWrap.hidden = false;
   } catch (err) {
     hideLoading();
@@ -78,6 +80,7 @@ async function newDocument() {
     fileNameEl.textContent = currentFileName;
     landing.hidden = true;
     mainNav.hidden = true;
+    landingFooter.hidden = true;
     editorWrap.hidden = false;
   } catch (err) {
     alert(`오류: ${err.message}`);
