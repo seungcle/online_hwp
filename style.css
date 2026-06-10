@@ -208,12 +208,6 @@ html, body {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── 프린트 ── */
-@media print {
-  #topbar, .landing-footer { display: none !important; }
-  #editor-container { height: 100vh; }
-}
-
 /* ── 푸터 ── */
 .landing-footer {
   position: fixed;

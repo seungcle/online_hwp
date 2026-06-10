@@ -95,8 +95,38 @@ fileInputReplace.addEventListener('change', (e) => {
   e.target.value = '';
 });
 
+async function exportPdf() {
+  if (!editor) return;
+  showLoading('PDF 생성 중...');
+  try {
+    const count = await editor.pageCount();
+    const svgs = [];
+    for (let i = 0; i < count; i++) {
+      svgs.push(await editor.getPageSvg(i));
+    }
+    hideLoading();
+    const win = window.open('', '_blank');
+    win.document.write(
+      '<!DOCTYPE html><html><head><style>' +
+      '*{margin:0;padding:0;box-sizing:border-box}' +
+      'body{background:white}' +
+      '.page{page-break-after:always}' +
+      '.page:last-child{page-break-after:avoid}' +
+      'svg{display:block;width:100%;height:auto}' +
+      '</style></head><body>' +
+      svgs.map(svg => `<div class="page">${svg}</div>`).join('') +
+      '<scr' + 'ipt>window.onload=function(){window.print()}<\/scr' + 'ipt>' +
+      '</body></html>'
+    );
+    win.document.close();
+  } catch (err) {
+    hideLoading();
+    alert(`PDF 내보내기 실패: ${err.message}`);
+  }
+}
+
 btnSave.addEventListener('click', saveFile);
-btnPdf.addEventListener('click', () => window.print());
+btnPdf.addEventListener('click', exportPdf);
 btnNew.addEventListener('click', newDocument);
 
 // 드래그 앤 드롭
