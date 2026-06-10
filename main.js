@@ -14,6 +14,7 @@ const btnNew       = document.getElementById('btn-new');
 const dropZone     = document.getElementById('drop-zone');
 const mainNav      = document.getElementById('main-nav');
 const landingFooter = document.querySelector('.landing-footer');
+const landingInfo  = document.getElementById('landing-info');
 
 let editor = null;
 let currentFileName = '';
@@ -45,6 +46,7 @@ async function loadFile(file) {
     landing.hidden = true;
     mainNav.hidden = true;
     landingFooter.hidden = true;
+    landingInfo.hidden = true;
     editorWrap.hidden = false;
   } catch (err) {
     hideLoading();
@@ -81,6 +83,7 @@ async function newDocument() {
     landing.hidden = true;
     mainNav.hidden = true;
     landingFooter.hidden = true;
+    landingInfo.hidden = true;
     editorWrap.hidden = false;
   } catch (err) {
     alert(`오류: ${err.message}`);

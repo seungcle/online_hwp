@@ -242,6 +242,46 @@ body {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── 랜딩 정보 ── */
+.landing-info {
+  padding: 0 24px 80px;
+}
+
+.info-grid {
+  max-width: 800px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.info-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  font-size: 0.85rem;
+}
+
+.info-card strong {
+  display: block;
+  font-size: 0.9rem;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.info-card p {
+  color: #64748b;
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .info-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 400px) {
+  .info-grid { grid-template-columns: 1fr; }
+}
+
 /* ── 푸터 ── */
 .landing-footer {
   position: fixed;
