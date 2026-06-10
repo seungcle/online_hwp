@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://rhwp.co.kr/sitemap.xml
