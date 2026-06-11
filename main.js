@@ -17,6 +17,7 @@ const landingFooter = document.querySelector('.landing-footer');
 const landingInfo  = document.getElementById('landing-info');
 
 let editor = null;
+let editorPromise = null;
 let currentFileName = '';
 
 function showLoading(msg = '불러오는 중...') {
@@ -28,10 +29,17 @@ function hideLoading() {
   loadingEl.hidden = true;
 }
 
+function warmupEditor() {
+  if (editor || editorPromise) return;
+  editorPromise = createEditor(editorContainer);
+  editorPromise.catch(() => { editorPromise = null; });
+}
+
 async function initEditor() {
   if (editor) return;
   showLoading('편집기 초기화 중...');
-  editor = await createEditor(editorContainer);
+  if (!editorPromise) editorPromise = createEditor(editorContainer);
+  editor = await editorPromise;
 }
 
 async function loadFile(file) {
@@ -141,6 +149,13 @@ async function exportPdf() {
 btnSave.addEventListener('click', saveFile);
 btnPdf.addEventListener('click', exportPdf);
 btnNew.addEventListener('click', newDocument);
+
+// 페이지 로드 후 idle 시 WASM 워밍업 — 첫 방문은 서비스 워커가 캐시, 이후 방문은 캐시에서 로드
+if ('requestIdleCallback' in window) {
+  requestIdleCallback(warmupEditor, { timeout: 3000 });
+} else {
+  setTimeout(warmupEditor, 1000);
+}
 
 // 드래그 앤 드롭
 ['dragenter', 'dragover'].forEach(ev =>
