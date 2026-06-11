@@ -9,7 +9,7 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
-    "@rhwp/editor": "^0.7.15"
+    "@rhwp/editor": "0.7.15"
   },
   "devDependencies": {
     "patch-package": "^8.0.1",
