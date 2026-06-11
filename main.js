@@ -10,7 +10,6 @@ const fileInput    = document.getElementById('file-input');
 const fileInputReplace = document.getElementById('file-input-replace');
 const btnSave      = document.getElementById('btn-save');
 const btnPdf       = document.getElementById('btn-pdf');
-const btnNew       = document.getElementById('btn-new');
 const dropZone     = document.getElementById('drop-zone');
 const mainNav      = document.getElementById('main-nav');
 const landingFooter = document.querySelector('.landing-footer');
@@ -81,23 +80,6 @@ async function saveFile() {
   hideLoading();
 }
 
-async function newDocument() {
-  showLoading('새 문서 만드는 중...');
-  try {
-    await initEditor();
-    currentFileName = '새 문서.hwp';
-    fileNameEl.textContent = currentFileName;
-    landing.hidden = true;
-    mainNav.hidden = true;
-    landingFooter.hidden = true;
-    landingInfo.hidden = true;
-    editorWrap.hidden = false;
-  } catch (err) {
-    alert(`오류: ${err.message}`);
-  }
-  hideLoading();
-}
-
 // 파일 입력 이벤트
 fileInput.addEventListener('change', (e) => {
   const file = e.target.files?.[0];
@@ -148,7 +130,6 @@ async function exportPdf() {
 
 btnSave.addEventListener('click', saveFile);
 btnPdf.addEventListener('click', exportPdf);
-btnNew.addEventListener('click', newDocument);
 
 // 페이지 로드 후 idle 시 WASM 워밍업 — 첫 방문은 서비스 워커가 캐시, 이후 방문은 캐시에서 로드
 if ('requestIdleCallback' in window) {
