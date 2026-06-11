@@ -5,12 +5,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@rhwp/editor": "^0.7.15"
   },
   "devDependencies": {
+    "patch-package": "^8.0.1",
     "vite": "^6.0.0"
   }
 }

@@ -1,0 +1,39 @@
+diff --git a/node_modules/@rhwp/editor/index.js b/node_modules/@rhwp/editor/index.js
+index 48a46a2..edb5cbc 100644
+--- a/node_modules/@rhwp/editor/index.js
++++ b/node_modules/@rhwp/editor/index.js
+@@ -88,7 +88,7 @@ class RhwpEditor {
+    * iframe에 요청을 보내고 응답을 기다립니다.
+    * @internal
+    */
+-  _request(method, params = {}) {
++  _request(method, params = {}, timeout = 10000) {
+     return new Promise((resolve, reject) => {
+       const id = ++requestId;
+       this._pending.set(id, { resolve, reject });
+@@ -96,13 +96,12 @@ class RhwpEditor {
+         { type: 'rhwp-request', id, method, params },
+         '*'
+       );
+-      // 10초 타임아웃
+       setTimeout(() => {
+         if (this._pending.has(id)) {
+           this._pending.delete(id);
+           reject(new Error(`Request timeout: ${method}`));
+         }
+-      }, 10000);
++      }, timeout);
+     });
+   }
+ 
+@@ -136,8 +135,8 @@ class RhwpEditor {
+    * ```
+    */
+   async loadFile(data, fileName = 'document.hwp') {
+-    const bytes = data instanceof ArrayBuffer ? Array.from(new Uint8Array(data)) : Array.from(data);
+-    return this._request('loadFile', { data: bytes, fileName });
++    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data instanceof ArrayBuffer ? data : data.buffer);
++    return this._request('loadFile', { data: bytes, fileName }, 120000);
+   }
+ 
+   /**
