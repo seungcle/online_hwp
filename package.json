@@ -5,14 +5,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "postinstall": "patch-package"
+    "preview": "npm run build && wrangler dev",
+    "postinstall": "patch-package",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@rhwp/editor": "0.7.15"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.40.2",
     "patch-package": "^8.0.1",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "wrangler": "^4.100.0"
   }
 }
