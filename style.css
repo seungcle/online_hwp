@@ -244,7 +244,7 @@ body {
 
 /* ── 랜딩 정보 ── */
 .landing-info {
-  padding: 0 24px 80px;
+  padding: 0 24px 40px;
 }
 
 .info-grid {
@@ -282,13 +282,64 @@ body {
   .info-grid { grid-template-columns: 1fr; }
 }
 
+/* ── 콘텐츠 섹션 ── */
+.landing-content {
+  padding: 0 24px 60px;
+}
+
+.content-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.content-section h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.content-section p {
+  font-size: 0.9rem;
+  color: #475569;
+  line-height: 1.8;
+  margin-bottom: 10px;
+}
+
+.content-section p:last-child { margin-bottom: 0; }
+
+.content-section ul,
+.content-section ol {
+  font-size: 0.9rem;
+  color: #475569;
+  line-height: 1.8;
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.content-section li strong { color: #1e293b; }
+
+.content-note {
+  margin-top: 14px;
+  font-size: 0.85rem !important;
+  color: #64748b !important;
+  background: #f8fafc;
+  border-left: 3px solid #2563EB;
+  padding: 10px 14px;
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 0 !important;
+}
+
 /* ── 푸터 ── */
 .landing-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 12px;
+  padding: 16px;
   text-align: center;
   font-size: 0.8rem;
   border-top: 1px solid #e2e8f0;

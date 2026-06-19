@@ -14,6 +14,7 @@ const dropZone     = document.getElementById('drop-zone');
 const mainNav      = document.getElementById('main-nav');
 const landingFooter = document.querySelector('.landing-footer');
 const landingInfo  = document.getElementById('landing-info');
+const landingContent = document.querySelector('.landing-content');
 
 let editor = null;
 let editorPromise = null;
@@ -53,6 +54,7 @@ async function loadFile(file) {
     mainNav.hidden = true;
     landingFooter.hidden = true;
     landingInfo.hidden = true;
+    landingContent.hidden = true;
     editorWrap.hidden = false;
   } catch (err) {
     hideLoading();
