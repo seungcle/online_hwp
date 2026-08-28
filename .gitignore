@@ -4,6 +4,9 @@ dist/
 .env
 .env.local
 
+# wrangler dev 가 읽는 로컬 키. 예시 파일(.dev.vars.example)만 커밋한다.
+.dev.vars
+
 # 실제 사내 HWPX는 저장소에 커밋하지 않는다.
 # 로컬 검증용 파일은 여기에 두면 통합 테스트가 자동으로 찾아 쓴다.
 samples/local/

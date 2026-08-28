@@ -21,7 +21,8 @@ npm run dev          # UI만
 npm run dev:worker   # Worker. dev와 함께 띄우면 /api 연결
 npm test
 npm run build        # tsc --noEmit && vite build → dist/
-npm run sample:edit  # samples/local/*.hwpx 를 수정해 samples/output/ 에 생성
+npm run sample:edit  # samples/local/*.hwpx 를 수정해 samples/output/ 에 생성 (AI 없이)
+npm run ai:check     # AI를 실제로 불러 왕복 확인. .dev.vars 에 OPENAI_API_KEY 필요
 ```
 
 ## 깨뜨리면 안 되는 것
@@ -48,6 +49,7 @@ master push → Cloudflare Workers Builds가 `npm run build` 후 `npx wrangler d
 
 - Worker 이름 `online-hwp`은 `rhwp.co.kr`이 붙어 있다. **바꾸면 도메인이 끊긴다.**
 - `OPENAI_API_KEY`는 Cloudflare Secret. 번들에 절대 넣지 않는다.
+  로컬에서는 `.dev.vars`(gitignore)에 두면 `wrangler dev`가 읽는다. `.dev.vars.example` 참고.
   없으면 `/api/edit-plan`이 503을 주고 나머지 기능은 정상 동작한다.
 - `ads.txt`, 네이버 소유확인, `robots.txt`, `sitemap.xml`은 도메인 자산이다. 지우지 마라.
 

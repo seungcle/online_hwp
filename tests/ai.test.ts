@@ -184,7 +184,8 @@ describe('resolveEditPlan', () => {
     const plan = resolveEditPlan({ summary: 's', operations: [ok('s0-p0', '바뀐 문장')] }, paragraphs)
     // 들여쓰기 공백 세 칸이 그대로 살아 있어야 한다. AI는 이 값을 만들지 않았다.
     expect(plan.operations[0]!.oldText).toBe('   - 들여쓰기가 있는 문단')
-    expect(plan.operations[0]!.newText).toBe('바뀐 문장')
+    // 앞 공백은 원문을 따른다 — 아래 '원문 앞뒤 공백' 묶음을 보라.
+    expect(plan.operations[0]!.newText).toBe('   바뀐 문장')
     expect(plan.operations[0]!.type).toBe('replace_text')
   })
 
@@ -226,5 +227,40 @@ describe('resolveEditPlan', () => {
     expect(() =>
       resolveEditPlan({ summary: 's', operations: [ok('s0-p0', 'a'), ok('s0-p0', 'b')] }, paragraphs),
     ).toThrow(PatchError)
+  })
+})
+
+describe('resolveEditPlan — 원문 앞뒤 공백', () => {
+  const paragraphs = [
+    { id: 's0-p0', text: '   - 들여쓰기가 있는 문단', where: '본문' },
+    { id: 's0-p1', text: '붙임1  ', where: '본문' },
+    { id: 's0-p2', text: '평범한 문단', where: '본문' },
+  ]
+  const op = (id: string, newText: string) => ({
+    paragraphId: id,
+    checksum: paragraphChecksum(paragraphs.find((p) => p.id === id)!.text),
+    newText,
+    reason: '요청',
+  })
+  const resolve = (id: string, newText: string) =>
+    resolveEditPlan({ summary: 's', operations: [op(id, newText)] }, paragraphs).operations[0]!
+      .newText
+
+  it('모델이 앞 공백을 지워도 원문 그대로 되돌린다', () => {
+    // 실측: gpt-4.1-mini는 프롬프트로 부탁해도 들여쓰기를 떨어뜨린다.
+    expect(resolve('s0-p0', '- 다듬은 문단')).toBe('   - 다듬은 문단')
+    expect(resolve('s0-p0', '   - 다듬은 문단')).toBe('   - 다듬은 문단')
+  })
+
+  it('뒤쪽 공백도 원문을 따른다', () => {
+    expect(resolve('s0-p1', '붙임2')).toBe('붙임2  ')
+  })
+
+  it('원문에 여백이 없으면 손대지 않는다', () => {
+    expect(resolve('s0-p2', '다듬은 문단')).toBe('다듬은 문단')
+  })
+
+  it('내용을 비우는 수정은 그대로 둔다 — 공백만 남기지 않는다', () => {
+    expect(resolve('s0-p0', '')).toBe('')
   })
 })

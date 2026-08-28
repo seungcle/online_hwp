@@ -155,7 +155,7 @@ export function resolveEditPlan(
       type: 'replace_text',
       paragraphId: operation.paragraphId,
       oldText: text,
-      newText: operation.newText,
+      newText: keepOuterSpacing(text, operation.newText),
       ...(operation.reason ? { reason: operation.reason } : {}),
     })
   }
@@ -167,6 +167,26 @@ export function resolveEditPlan(
     )
   }
   return { operations, summary: response.summary }
+}
+
+/**
+ * 문단 앞뒤의 공백을 원문 그대로 되돌린다.
+ *
+ * 한글 문서는 들여쓰기를 문단 앞 공백으로 넣는 일이 흔하다(실측 27%).
+ * 모델은 문장을 다듬으면서 이 공백을 군더더기로 보고 지운다. 프롬프트로
+ * 부탁해도 지운다 — 실제로 gpt-4.1-mini는 들여쓰기 있는 문단 6개 전부에서
+ * 앞 공백을 떨어뜨렸다. 그러면 검증은 통과하는데 문서 모양이 조용히 바뀐다.
+ *
+ * 그래서 부탁하지 않고 기계적으로 되돌린다. 모델이 맡는 것은 문장이고,
+ * 들여쓰기는 레이아웃에 가깝다. 이 도구는 레이아웃을 건드리지 않는다.
+ * (제로폭 공백은 `trim`의 대상이 아니므로 내용으로 취급되어 그대로 남는다.)
+ */
+function keepOuterSpacing(original: string, replacement: string): string {
+  const body = replacement.trim()
+  if (body.length === 0 || original.trim().length === 0) return replacement
+  const lead = original.slice(0, original.length - original.trimStart().length)
+  const trail = original.slice(original.trimEnd().length)
+  return `${lead}${body}${trail}`
 }
 
 async function readError(response: Response): Promise<{ code: string; message: string }> {
