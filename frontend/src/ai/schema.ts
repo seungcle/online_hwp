@@ -83,7 +83,16 @@ export const SYSTEM_PROMPT = `너는 한글(HWPX) 문서의 텍스트를 수정�
 - 표 안 문단은 보통 짧은 값이다. 셀에 맞는 길이로 쓴다.
 - 줄바꿈 문자를 넣지 않는다. 문단을 나누거나 합칠 수 없다.
 - 요청이 문서와 관계없거나 바꿀 것이 없으면 operations를 빈 배열로 두고
-  summary에 이유를 적는다.`
+  summary에 이유를 적는다.
+
+사용자는 명령어가 아니라 평소 말투로 말한다. "좀 더 읽기 쉽게", "있어 보이게",
+"오타 좀" 같은 두루뭉술한 말도 요청으로 받아들이고, 문서를 읽어 알아서 판단한다.
+형식을 갖춰 다시 쓰라고 요구하지 않는다.
+
+무엇으로 바꿀지 정말 알 수 없을 때만 되묻는다. 되물을 때는 summary에 한 문장으로
+묻고, 앞 대화가 함께 오면 그 답을 이어받아 바로 수정한다. 예를 들어 앞에서
+"제목을 무엇으로 바꿀까요?"라고 물었고 이번에 "AI 교육 제안서로"가 오면,
+그것이 제목을 바꾸라는 뜻이다. 다시 묻지 않는다.`
 
 /**
  * 문단 텍스트 하나를 짧은 검증코드로 줄인다.
@@ -113,9 +122,23 @@ export interface DocumentParagraph {
   readonly where: string
 }
 
+/**
+ * 지난 대화 한 마디. 되물음에 이어서 답할 수 있게 하려고 보낸다.
+ *
+ * "제목 바꿔줘" → "무엇으로 바꿀까요?" → "AI 교육 제안서로" 가 이어지려면
+ * 모델이 앞 두 마디를 봐야 한다. 문단 목록은 매번 현재 문서에서 새로 만들어
+ * 마지막 요청에만 싣는다. 지난 턴에는 말만 남는다.
+ */
+export interface ConversationTurn {
+  readonly role: 'user' | 'assistant'
+  readonly content: string
+}
+
 export interface EditPlanRequest {
   readonly instruction: string
   readonly paragraphs: readonly DocumentParagraph[]
+  /** 오래된 것부터. 없으면 첫 요청이다. */
+  readonly history?: readonly ConversationTurn[]
 }
 
 export interface EditPlanOperation {
@@ -135,6 +158,8 @@ export interface EditPlanResponse {
 export const MAX_PARAGRAPHS = 1500
 export const MAX_TOTAL_CHARS = 120_000
 export const MAX_INSTRUCTION_CHARS = 4_000
+/** 함께 보낼 지난 대화 수. 되물음 한두 번을 잇기에 충분하고 토큰도 아낀다. */
+export const MAX_HISTORY_TURNS = 8
 
 export class SchemaError extends Error {
   override name = 'SchemaError'
@@ -197,6 +222,17 @@ export function validateRequest(request: EditPlanRequest): void {
     throw new SchemaError(
       `문단이 너무 많습니다(${request.paragraphs.length}개). 현재는 ${MAX_PARAGRAPHS}개까지 지원합니다.`,
     )
+  }
+  if (request.history && request.history.length > MAX_HISTORY_TURNS) {
+    throw new SchemaError(`대화 기록이 너무 깁니다(${request.history.length}턴).`)
+  }
+  for (const turn of request.history ?? []) {
+    if (turn.role !== 'user' && turn.role !== 'assistant') {
+      throw new SchemaError('대화 기록의 role이 올바르지 않습니다.')
+    }
+    if (typeof turn.content !== 'string') {
+      throw new SchemaError('대화 기록의 content가 문자열이 아닙니다.')
+    }
   }
   const total = request.paragraphs.reduce((sum, item) => sum + item.text.length, 0)
   if (total > MAX_TOTAL_CHARS) {

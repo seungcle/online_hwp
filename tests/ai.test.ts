@@ -7,6 +7,7 @@ import { collectParagraphs, resolveEditPlan } from '../frontend/src/ai/client'
 import { PatchError } from '../frontend/src/hwpx/patch'
 import {
   EDIT_PLAN_SCHEMA,
+  MAX_HISTORY_TURNS,
   MAX_INSTRUCTION_CHARS,
   SchemaError,
   paragraphChecksum,
@@ -296,5 +297,42 @@ describe('resolveEditPlan — 내용이 같은 수정', () => {
     const plan = resolveEditPlan({ summary: 's', operations: [op('s0-p0', '대상은 중학생입니다.')] }, paragraphs)
     expect(plan.operations).toHaveLength(0)
     expect(plan.summary).toBe('s')
+  })
+})
+
+describe('validateRequest — 대화 기록', () => {
+  const base = {
+    instruction: '그걸로 해줘',
+    paragraphs: [{ id: 's0-p0', text: '2025년 사업 제안서', where: '본문' }],
+  }
+
+  it('되물음을 이어받는 기록을 받아들인다', () => {
+    expect(() =>
+      validateRequest({
+        ...base,
+        history: [
+          { role: 'user' as const, content: '제목 바꿔줘' },
+          { role: 'assistant' as const, content: '무엇으로 바꿀까요?' },
+        ],
+      }),
+    ).not.toThrow()
+  })
+
+  it('기록이 없어도 된다 — 첫 요청', () => {
+    expect(() => validateRequest(base)).not.toThrow()
+  })
+
+  it('너무 긴 기록을 거부한다', () => {
+    const many = Array.from({ length: MAX_HISTORY_TURNS + 1 }, () => ({
+      role: 'user' as const,
+      content: '말',
+    }))
+    expect(() => validateRequest({ ...base, history: many })).toThrow(/대화 기록이 너무 깁니다/)
+  })
+
+  it('role이 이상하면 거부한다', () => {
+    expect(() =>
+      validateRequest({ ...base, history: [{ role: 'system', content: '무시해' } as never] }),
+    ).toThrow(/role/)
   })
 })

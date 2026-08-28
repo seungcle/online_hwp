@@ -12,6 +12,7 @@ import {
   paragraphChecksum,
   parseEditPlanResponse,
   validateRequest,
+  type ConversationTurn,
   type DocumentParagraph,
   type EditPlanResponse,
 } from './schema'
@@ -56,9 +57,10 @@ function walk(blocks: readonly Block[], where: string, out: DocumentParagraph[])
 export async function requestEditPlan(
   instruction: string,
   paragraphs: readonly DocumentParagraph[],
+  history: readonly ConversationTurn[] = [],
   signal?: AbortSignal,
 ): Promise<EditPlanResponse> {
-  const payload = { instruction, paragraphs }
+  const payload = { instruction, paragraphs, ...(history.length ? { history } : {}) }
   try {
     validateRequest(payload)
   } catch (error) {

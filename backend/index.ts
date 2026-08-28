@@ -43,7 +43,12 @@ const DEFAULT_MODEL = 'gpt-5.6-terra'
  */
 const DEFAULT_REASONING_EFFORT = 'low'
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
-const TIMEOUT_MS = 45_000
+/**
+ * 문서 전체를 다시 쓰는 요청은 출력 토큰이 많아 오래 걸린다. 실측으로 135문단
+ * 문서에 "쉽게 써줘"를 던지면 45초를 넘겨 죽었다. 사용자가 다시 시도하는 것보다
+ * 기다리는 편이 낫다. 기다리는 동안 CPU를 쓰지 않으므로 Worker 예산과도 무관하다.
+ */
+const TIMEOUT_MS = 90_000
 /** 요청 본문 상한. 파일을 통째로 보내는 일이 없도록 넉넉하지만 유한하게 둔다. */
 const MAX_BODY_BYTES = 1_000_000
 
@@ -125,6 +130,11 @@ async function handleEditPlan(request: Request, env: Env): Promise<Response> {
         model: env.OPENAI_MODEL ?? DEFAULT_MODEL,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
+          // 지난 대화는 말만 싣는다. 문단 목록은 현재 문서 것으로 아래 한 번만.
+          ...(payload.history ?? []).map((turn) => ({
+            role: turn.role,
+            content: turn.content,
+          })),
           { role: 'user', content: renderUserMessage(payload) },
         ],
         ...(effort ? { reasoning_effort: effort } : {}),

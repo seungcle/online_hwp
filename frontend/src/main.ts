@@ -6,6 +6,7 @@
  */
 
 import { AiError, collectParagraphs, requestEditPlan, resolveEditPlan } from './ai/client'
+import { MAX_HISTORY_TURNS, type ConversationTurn } from './ai/schema'
 import { HwpxError } from './hwpx/package'
 import { PatchError } from './hwpx/patch'
 import { HwpxDocument } from './hwpx/session'
@@ -107,21 +108,37 @@ aiForm.addEventListener('submit', (event) => {
 
 aiCancel.addEventListener('click', () => inFlight?.abort())
 
+/**
+ * 지난 대화. AI가 되물었을 때 그 답을 이어받으려면 앞 마디를 알아야 한다.
+ * 문단 목록은 매번 현재 문서에서 새로 만들고, 여기에는 주고받은 말만 남는다.
+ */
+let history: ConversationTurn[] = []
+
+function remember(role: ConversationTurn['role'], content: string): void {
+  if (!content) return
+  history.push({ role, content })
+  // 오래된 것부터 버린다. 되물음 한두 번을 잇기에는 넉넉하다.
+  if (history.length > MAX_HISTORY_TURNS) history = history.slice(-MAX_HISTORY_TURNS)
+}
+
 async function runEdit(): Promise<void> {
   if (!doc || inFlight) return
   const instruction = aiInput.value.trim()
   if (!instruction) return
 
   appendUser(instruction)
+  remember('user', instruction)
   aiInput.value = ''
   setBusy(true)
-  const pending = appendPending('문서를 읽고 수정할 부분을 찾는 중…')
+  const pending = appendPending('문서를 읽고 수정할 부분을 찾는 중…')  // 긴 문서는 1분 넘게 걸리기도 한다
 
   const controller = new AbortController()
   inFlight = controller
   try {
     const paragraphs = collectParagraphs(doc.model)
-    const response = await requestEditPlan(instruction, paragraphs, controller.signal)
+    const response = await requestEditPlan(instruction, paragraphs, history, controller.signal)
+
+    remember('assistant', response.summary)
 
     if (response.operations.length === 0) {
       pending.replaceWith(note(response.summary || '바꿀 내용을 찾지 못했습니다.', 'ai-note'))
@@ -188,7 +205,7 @@ function renderFailure(error: unknown): HTMLElement {
     box.innerHTML =
       `<p><b>수정하지 않았습니다.</b> ${escapeHtml(error.message)}</p>` +
       `<ul class="diff">${items}</ul>` +
-      '<p class="ai-hint-inline">문서는 그대로입니다. 요청을 조금 더 구체적으로 적어 다시 시도해 보세요.</p>'
+      '<p class="ai-hint-inline">문서는 그대로입니다. 한 번 더 말해 주시면 다시 해 보겠습니다.</p>'
     return box
   }
   const message =
@@ -220,13 +237,15 @@ function setBusy(busy: boolean): void {
   aiSubmit.disabled = busy
   aiInput.disabled = busy
   aiCancel.hidden = !busy
-  aiSubmit.textContent = busy ? '생각하는 중…' : '수정 계획 만들기'
+  aiSubmit.textContent = busy ? '생각하는 중…' : '수정하기'
 }
 
 function resetLog(): void {
+  // 새 문서를 열면 지난 대화도 버린다. 다른 문서 이야기를 이어받으면 안 된다.
+  history = []
   aiLog.innerHTML =
-    '<p class="ai-empty">바꾸고 싶은 내용을 문장으로 적어 주세요.<br>' +
-    '예) “대상을 중학생으로, 기간을 3개월로 바꿔줘”</p>'
+    '<p class="ai-empty">평소 말하듯 적어 주세요. 문서는 알아서 읽습니다.<br>' +
+    '예) “좀 더 읽기 쉽게 해줘”, “대상을 중학생으로 바꿔줘”</p>'
 }
 
 function appendUser(text: string): void {

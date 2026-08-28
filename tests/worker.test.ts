@@ -117,6 +117,34 @@ describe('/api/edit-plan', () => {
     expect('reasoning_effort' in plain).toBe(false)
   })
 
+  it('지난 대화를 시스템 프롬프트와 이번 요청 사이에 끼워 보낸다', async () => {
+    const spy = vi.fn(async () => openAiReply({ summary: 's', operations: [] }))
+    globalThis.fetch = spy as never
+    await worker.fetch(
+      post({
+        ...validBody,
+        instruction: 'AI 교육 제안서로',
+        history: [
+          { role: 'user', content: '제목 바꿔줘' },
+          { role: 'assistant', content: '무엇으로 바꿀까요?' },
+        ],
+      }),
+      env({ OPENAI_API_KEY: 'k' }),
+    )
+    const sent = JSON.parse((spy.mock.calls[0] as never as [string, RequestInit])[1].body as string)
+    expect(sent.messages.map((m: { role: string }) => m.role)).toEqual([
+      'system',
+      'user',
+      'assistant',
+      'user',
+    ])
+    expect(sent.messages[1].content).toBe('제목 바꿔줘')
+    expect(sent.messages[2].content).toBe('무엇으로 바꿀까요?')
+    // 문단 목록은 마지막 요청에만 실린다.
+    expect(sent.messages[3].content).toContain('[s0-p0 ')
+    expect(sent.messages[1].content).not.toContain('[s0-p0 ')
+  })
+
   it('키가 틀리면 원인을 그대로 알려 준다', async () => {
     // 로컬에서 .dev.vars 자리표시자를 그대로 둔 경우. "AI 서비스 오류"로
     // 뭉뚱그리면 원인을 찾는 데 한참 걸린다.

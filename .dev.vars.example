@@ -6,7 +6,11 @@
 #   npm run ai:check        # 실제 문서로 왕복 한 번 돌려 본다
 #
 # .dev.vars 는 gitignore 대상이다. 실서비스 키는 Cloudflare Secret에만 둔다.
-OPENAI_API_KEY=sk-REPLACE_ME   # 여기에 진짜 키를 붙여넣는다
+# 아래 = 뒤에 키를 붙여넣는다. 주의할 것 두 가지.
+#  - 같은 줄에 주석(#)을 달지 마라. 주석까지 값으로 들어간다.
+#  - OpenAI 화면에 sk-proj-•••• 로 가려져 보이는 것을 복사하지 마라.
+#    키 전체 값은 발급 직후 한 번만 보인다.
+OPENAI_API_KEY=
 
 # 선택. 비워 두면 gpt-5.6-terra 를 쓴다.
 # OPENAI_MODEL=gpt-5.6-terra
