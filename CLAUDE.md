@@ -48,6 +48,9 @@ npm run ai:check     # AI를 실제로 불러 왕복 확인. .dev.vars 에 OPENA
 master push → Cloudflare Workers Builds가 `npm run build` 후 `npx wrangler deploy`.
 
 - Worker 이름 `online-hwp`은 `rhwp.co.kr`이 붙어 있다. **바꾸면 도메인이 끊긴다.**
+- 모델은 `gpt-5.6-terra`(균형 등급) + `reasoning_effort: low`. `OPENAI_MODEL`,
+  `OPENAI_REASONING_EFFORT`로 바꿀 수 있다. 추론을 지원하지 않는 모델을 쓸 때는
+  `OPENAI_REASONING_EFFORT`를 빈 값으로 둬야 400이 안 난다.
 - `OPENAI_API_KEY`는 Cloudflare Secret. 번들에 절대 넣지 않는다.
   로컬에서는 `.dev.vars`(gitignore)에 두면 `wrangler dev`가 읽는다. `.dev.vars.example` 참고.
   없으면 `/api/edit-plan`이 503을 주고 나머지 기능은 정상 동작한다.

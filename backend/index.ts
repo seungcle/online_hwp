@@ -27,9 +27,21 @@ interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> }
   OPENAI_API_KEY?: string
   OPENAI_MODEL?: string
+  OPENAI_REASONING_EFFORT?: string
 }
 
-const DEFAULT_MODEL = 'gpt-4.1-mini'
+/**
+ * 기본 모델. 이 작업은 "문서 전체를 읽고 고칠 문단만 고른 뒤 한국어를 다듬는"
+ * 일이라 문맥 유지와 지시 준수가 품질을 가른다. 균형 등급인 terra를 쓴다.
+ * (sol은 이 작업에 과하고, luna는 긴 문서에서 엉뚱한 문단을 짚는 일이 늘어난다.)
+ */
+const DEFAULT_MODEL = 'gpt-5.6-terra'
+/**
+ * 추론 깊이. 깊은 추론이 필요한 작업이 아니고, 낮출수록 응답이 빨라
+ * 아래 제한 시간에 걸릴 일이 준다. 추론을 지원하지 않는 모델로 바꾼다면
+ * `OPENAI_REASONING_EFFORT`를 빈 값으로 두어 아예 보내지 않는다.
+ */
+const DEFAULT_REASONING_EFFORT = 'low'
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
 const TIMEOUT_MS = 45_000
 /** 요청 본문 상한. 파일을 통째로 보내는 일이 없도록 넉넉하지만 유한하게 둔다. */
@@ -98,6 +110,7 @@ async function handleEditPlan(request: Request, env: Env): Promise<Response> {
     )
   }
 
+  const effort = env.OPENAI_REASONING_EFFORT ?? DEFAULT_REASONING_EFFORT
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
@@ -114,6 +127,7 @@ async function handleEditPlan(request: Request, env: Env): Promise<Response> {
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: renderUserMessage(payload) },
         ],
+        ...(effort ? { reasoning_effort: effort } : {}),
         response_format: {
           type: 'json_schema',
           json_schema: { name: 'edit_plan', strict: true, schema: EDIT_PLAN_SCHEMA },

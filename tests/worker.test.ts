@@ -15,6 +15,7 @@ interface FakeEnv {
   ASSETS: { fetch(request: Request): Promise<Response> }
   OPENAI_API_KEY?: string
   OPENAI_MODEL?: string
+  OPENAI_REASONING_EFFORT?: string
 }
 
 function env(overrides: Partial<FakeEnv> = {}): FakeEnv {
@@ -95,6 +96,25 @@ describe('/api/edit-plan', () => {
     const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual(plan)
+  })
+
+  it('추론 등급을 함께 보내고, 빈 값이면 아예 빼고 보낸다', async () => {
+    // 추론을 지원하지 않는 모델로 바꿀 때 400이 나지 않도록 빠질 수 있어야 한다.
+    const spy = vi.fn(async () => openAiReply({ summary: 's', operations: [] }))
+    globalThis.fetch = spy as never
+    await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
+    const sent = JSON.parse((spy.mock.calls[0] as never as [string, RequestInit])[1].body as string)
+    expect(sent.model).toBe('gpt-5.6-terra')
+    expect(sent.reasoning_effort).toBe('low')
+
+    spy.mockClear()
+    await worker.fetch(
+      post(validBody),
+      env({ OPENAI_API_KEY: 'k', OPENAI_MODEL: 'gpt-4.1-mini', OPENAI_REASONING_EFFORT: '' }),
+    )
+    const plain = JSON.parse((spy.mock.calls[0] as never as [string, RequestInit])[1].body as string)
+    expect(plain.model).toBe('gpt-4.1-mini')
+    expect('reasoning_effort' in plain).toBe(false)
   })
 
   it('키가 틀리면 원인을 그대로 알려 준다', async () => {

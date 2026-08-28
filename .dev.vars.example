@@ -8,5 +8,7 @@
 # .dev.vars 는 gitignore 대상이다. 실서비스 키는 Cloudflare Secret에만 둔다.
 OPENAI_API_KEY=sk-REPLACE_ME   # 여기에 진짜 키를 붙여넣는다
 
-# 선택. 비워 두면 gpt-4.1-mini 를 쓴다.
-# OPENAI_MODEL=gpt-4.1-mini
+# 선택. 비워 두면 gpt-5.6-terra 를 쓴다.
+# OPENAI_MODEL=gpt-5.6-terra
+# 선택. 비워 두면 low. 추론을 지원하지 않는 모델을 쓸 때는 빈 값으로 둔다.
+# OPENAI_REASONING_EFFORT=low
