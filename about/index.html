@@ -5,81 +5,59 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2273817974546954" crossorigin="anonymous"></script>
-  <title>서비스 소개 – HWP 온라인 편집기</title>
-  <meta name="description" content="HWP 온라인 편집기 서비스 소개. 설치 없이 브라우저에서 HWP 파일을 편집할 수 있는 무료 웹 서비스입니다." />
+  <title>서비스 소개 – rhwp</title>
+  <meta name="description" content="rhwp는 한글 HWPX 양식을 유지한 채 내용만 AI로 수정하는 웹 서비스입니다. 파일은 브라우저를 벗어나지 않습니다." />
+  <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://rhwp.co.kr/about/" />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="https://rhwp.co.kr/about/" />
-  <meta property="og:title" content="서비스 소개 – HWP 온라인 편집기" />
-  <meta property="og:description" content="HWP 온라인 편집기 서비스 소개. 설치 없이 브라우저에서 HWP 파일을 편집할 수 있는 무료 웹 서비스입니다." />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; }
-    .container { max-width: 720px; margin: 40px auto; padding: 0 16px 60px; }
-    .wrap { background: white; border-radius: 16px; padding: 48px; }
-    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
-    .lead { font-size: 0.95rem; color: #64748b; margin-bottom: 40px; }
-    h2 { font-size: 1rem; font-weight: 700; margin: 32px 0 12px; color: #0f172a; }
-    p { font-size: 0.95rem; line-height: 1.8; color: #334155; }
-    .features { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
-    .feature-card { background: #f8fafc; border-radius: 12px; padding: 20px; }
-    .feature-icon { font-size: 1.5rem; margin-bottom: 8px; }
-    .feature-title { font-size: 0.9rem; font-weight: 600; color: #0f172a; margin-bottom: 4px; }
-    .feature-desc { font-size: 0.85rem; color: #64748b; line-height: 1.6; }
-    a { color: #2563EB; }
-    .cta { display: inline-block; margin-top: 32px; padding: 12px 32px; background: #2563EB; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.95rem; }
-    .cta:hover { background: #1d4ed8; }
-    .related { margin-top: 40px; padding-top: 24px; border-top: 1px solid #f1f5f9; font-size: 0.9rem; color: #64748b; }
-    .related a { color: #2563EB; margin-right: 16px; }
-    @media (max-width: 480px) { .features { grid-template-columns: 1fr; } }
-  </style>
+  <meta property="og:title" content="서비스 소개 – rhwp" />
+  <meta property="og:description" content="rhwp는 한글 HWPX 양식을 유지한 채 내용만 AI로 수정하는 웹 서비스입니다. 파일은 브라우저를 벗어나지 않습니다." />
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div class="container">
-    <div class="wrap">
-      <h1>서비스 소개</h1>
-      <p class="lead">HWP 온라인 편집기는 한글(HWP) 문서를 설치 없이 브라우저에서 바로 편집할 수 있는 무료 웹 서비스입니다.</p>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">r</span><span class="brand-name">rhwp</span></a>
+    <nav class="topbar-nav">
+      <a href="/guide/">사용 가이드</a>
+      <a href="/faq/">자주 묻는 질문</a>
+      <a href="/about/">서비스 소개</a>
+    </nav>
+  </header>
+  <main class="doc">
+    <h1>서비스 소개</h1>
+    <p class="lead">rhwp는 한글에서 만든 <code>.hwpx</code> 양식을 그대로 둔 채, 안의 내용만 바꾸는 도구입니다.</p>
 
-      <h2>왜 만들었나요?</h2>
-      <p>HWP 파일은 국내에서 가장 널리 사용되는 문서 형식 중 하나지만, 한글과컴퓨터 프로그램 없이는 열기 어렵습니다. macOS, Linux 사용자나 HWP 프로그램이 설치되지 않은 환경에서는 공공기관 서류, 이력서, 계약서 등 HWP 형식의 문서를 편집하는 것이 불편했습니다. 이 서비스는 그런 불편함을 해소하기 위해 만들어졌습니다.</p>
+    <h2>무엇을 푸는 도구인가</h2>
+    <p>사내 문서 작업의 상당 부분은 새 문서를 쓰는 일이 아니라, 이미 정해진 양식에 내용을 맞춰 넣는 일입니다.
+       표 위치와 글꼴, 로고, 여백은 건드리면 안 되고 바꿔야 하는 건 글자뿐입니다.
+       그런데 보통의 문서 자동화 도구는 문서를 새로 그려 버려서 양식이 무너집니다.</p>
+    <p>rhwp는 반대로 갑니다. <strong>원본 파일의 나머지 바이트는 손대지 않고, 바뀌는 글자 구간만 교체합니다.</strong>
+       그래서 결과 파일을 한글에서 열었을 때 원본과 같은 모습이 유지됩니다.</p>
 
-      <h2>주요 특징</h2>
-      <div class="features">
-        <div class="feature-card">
-          <div class="feature-icon">🌐</div>
-          <div class="feature-title">설치 불필요</div>
-          <div class="feature-desc">크롬, 사파리, 엣지 등 브라우저만 있으면 바로 사용할 수 있습니다.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">🔒</div>
-          <div class="feature-title">개인정보 보호</div>
-          <div class="feature-desc">파일은 서버로 전송되지 않고 브라우저 내에서만 처리됩니다.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">💸</div>
-          <div class="feature-title">완전 무료</div>
-          <div class="feature-desc">회원가입 없이 무료로 사용할 수 있습니다.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">📄</div>
-          <div class="feature-title">PDF 내보내기</div>
-          <div class="feature-desc">HWP 파일을 PDF로 변환해 저장할 수 있습니다.</div>
-        </div>
-      </div>
+    <h2>AI는 판단만 합니다</h2>
+    <p>AI에게 HWPX 파일이나 XML을 직접 만들게 하지 않습니다. AI가 하는 일은 어느 문단의 어떤 문장을
+       무엇으로 바꿀지를 구조화된 형태로 정하는 데까지입니다. 실제 파일 수정은 규칙이 정해진 프로그램이 담당합니다.
+       이렇게 나눠야 결과가 예측 가능하고, 잘못됐을 때 어디가 문제인지 짚을 수 있습니다.</p>
 
-      <h2>지원 형식</h2>
-      <p>HWP (.hwp) 및 HWPX (.hwpx) 형식의 파일을 지원합니다. 편집 후 HWP 형식으로 저장하거나 PDF로 내보낼 수 있습니다.</p>
+    <h2>지금 되는 것</h2>
+    <ul>
+      <li>HWPX 업로드와 구조 분석</li>
+      <li>문단과 표 텍스트를 뽑아낸 경량 미리보기</li>
+      <li>여러 조각으로 나뉜 문장까지 하나로 이어 읽기</li>
+    </ul>
 
-      <h2>문의</h2>
-      <p>서비스 관련 문의는 <a href="mailto:dkdltmdcks@gmail.com">dkdltmdcks@gmail.com</a>으로 연락해 주세요.</p>
-
-      <div class="related">
-        관련 페이지: <a href="/guide/">사용 가이드</a><a href="/faq/">자주 묻는 질문</a>
-      </div>
-      <a href="/" class="cta">편집기 바로 사용하기</a>
-    </div>
-  </div>
-
-  <script type="module" src="/components/layout.js"></script>
+    <h2>아직 안 되는 것</h2>
+    <ul>
+      <li>AI 수정 요청 — 다음 단계에서 붙습니다</li>
+      <li>구형 <code>.hwp</code> 형식 — 한글에서 HWPX로 저장해 주세요</li>
+      <li>한글과 똑같은 화면 재현 — 미리보기는 내용 확인용입니다</li>
+      <li>이미지·도형 편집, 표 추가와 삭제, 페이지 레이아웃 변경</li>
+    </ul>
+    <p class="doc-cta"><a class="btn btn--primary" href="/">HWPX 열어보기</a></p>
+  </main>
+  <footer class="footer">
+    <a href="/privacy/">개인정보처리방침</a><span>·</span><a href="/about/">서비스 소개</a>
+  </footer>
 </body>
 </html>

@@ -5,108 +5,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2273817974546954" crossorigin="anonymous"></script>
-  <title>사용 가이드 – HWP 온라인 편집기</title>
-  <meta name="description" content="HWP 온라인 편집기 사용 방법을 안내합니다. 파일 열기, 편집, HWP 저장, PDF 내보내기까지 단계별로 설명합니다." />
+  <title>사용 가이드 – rhwp</title>
+  <meta name="description" content="rhwp에서 HWPX 파일을 열고 미리보기를 확인하는 방법, 그리고 지원되는 문서 형태를 설명합니다." />
+  <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://rhwp.co.kr/guide/" />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="https://rhwp.co.kr/guide/" />
-  <meta property="og:title" content="사용 가이드 – HWP 온라인 편집기" />
-  <meta property="og:description" content="HWP 온라인 편집기 사용 방법을 안내합니다. 파일 열기, 편집, HWP 저장, PDF 내보내기까지 단계별로 설명합니다." />
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "HowTo",
-    "name": "HWP 온라인 편집기 사용 방법",
-    "description": "설치 없이 브라우저에서 HWP/HWPX 파일을 열고 편집하는 방법",
-    "step": [
-      {
-        "@type": "HowToStep",
-        "position": 1,
-        "name": "파일 열기",
-        "text": "HWP 또는 HWPX 파일을 드래그 앤 드롭하거나 파일 선택 버튼으로 업로드하세요."
-      },
-      {
-        "@type": "HowToStep",
-        "position": 2,
-        "name": "문서 편집",
-        "text": "파일이 열리면 편집기가 자동으로 실행됩니다. 텍스트 수정, 서식 변경 등 다양한 편집 작업을 수행할 수 있습니다."
-      },
-      {
-        "@type": "HowToStep",
-        "position": 3,
-        "name": "HWP로 저장",
-        "text": "편집이 완료된 문서를 상단 우측의 저장 버튼을 클릭해 HWP 파일로 다운로드하세요."
-      },
-      {
-        "@type": "HowToStep",
-        "position": 4,
-        "name": "PDF로 내보내기",
-        "text": "상단의 PDF 버튼을 클릭한 뒤 인쇄 다이얼로그에서 PDF로 저장을 선택하세요."
-      }
-    ]
-  }
-  </script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; }
-    .container { max-width: 720px; margin: 40px auto; padding: 0 16px 60px; }
-    .wrap { background: white; border-radius: 16px; padding: 48px; }
-    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
-    .lead { font-size: 0.95rem; color: #64748b; margin-bottom: 40px; }
-    h2 { font-size: 1rem; font-weight: 700; margin: 32px 0 12px; color: #0f172a; display: flex; align-items: center; gap: 8px; }
-    .step-num { background: #2563EB; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; }
-    p, li { font-size: 0.95rem; line-height: 1.8; color: #334155; }
-    ul { padding-left: 20px; margin-top: 8px; }
-    li { margin-bottom: 4px; }
-    .tip { background: #eff6ff; border-left: 3px solid #2563EB; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-top: 12px; font-size: 0.9rem; color: #1e40af; }
-    a { color: #2563EB; }
-    .cta { display: inline-block; margin-top: 32px; padding: 12px 32px; background: #2563EB; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.95rem; }
-    .cta:hover { background: #1d4ed8; }
-    .related { margin-top: 40px; padding-top: 24px; border-top: 1px solid #f1f5f9; font-size: 0.9rem; color: #64748b; }
-    .related a { color: #2563EB; margin-right: 16px; }
-  </style>
+  <meta property="og:title" content="사용 가이드 – rhwp" />
+  <meta property="og:description" content="rhwp에서 HWPX 파일을 열고 미리보기를 확인하는 방법, 그리고 지원되는 문서 형태를 설명합니다." />
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div class="container">
-    <div class="wrap">
-      <h1>사용 가이드</h1>
-      <p class="lead">HWP 온라인 편집기는 별도 설치 없이 브라우저에서 바로 HWP, HWPX 파일을 열고 편집할 수 있는 무료 서비스입니다.</p>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">r</span><span class="brand-name">rhwp</span></a>
+    <nav class="topbar-nav">
+      <a href="/guide/">사용 가이드</a>
+      <a href="/faq/">자주 묻는 질문</a>
+      <a href="/about/">서비스 소개</a>
+    </nav>
+  </header>
+  <main class="doc">
+    <h1>사용 가이드</h1>
+    <p class="lead">지금은 HWPX를 열어 내용을 확인하는 단계까지 제공합니다.</p>
 
-      <h2><span class="step-num">1</span> 파일 열기</h2>
-      <p>HWP 또는 HWPX 파일을 편집기에서 여는 방법은 두 가지입니다.</p>
-      <ul>
-        <li><strong>드래그 앤 드롭:</strong> 파일을 화면 중앙의 업로드 영역에 끌어다 놓으세요.</li>
-        <li><strong>파일 선택:</strong> 「파일 선택」 버튼을 클릭해 탐색기에서 파일을 선택하세요.</li>
-      </ul>
-      <div class="tip">💡 .hwp와 .hwpx 두 형식 모두 지원합니다.</div>
+    <h2>1. 파일 열기</h2>
+    <p>첫 화면의 상자에 <code>.hwpx</code> 파일을 끌어다 놓거나 클릭해서 선택합니다.
+       파일은 브라우저 안에서만 열리고 어디로도 전송되지 않습니다.</p>
 
-      <h2><span class="step-num">2</span> 문서 편집</h2>
-      <p>파일이 열리면 편집기가 자동으로 실행됩니다. 텍스트 수정, 서식 변경 등 다양한 편집 작업을 수행할 수 있습니다. 상단 툴바를 통해 여러 편집 도구를 사용할 수 있습니다.</p>
-      <ul>
-        <li>텍스트 입력 및 수정</li>
-        <li>글꼴, 크기, 색상 등 서식 변경</li>
-        <li>표, 이미지 삽입</li>
-      </ul>
+    <h2>2. 미리보기 확인</h2>
+    <p>문단과 표의 텍스트가 화면에 나옵니다. 글꼴과 색, 정렬, 페이지 나눔은 재현하지 않습니다.
+       한글과 똑같이 보이게 하는 것이 목적이 아니라 <strong>어디에 어떤 내용이 들어 있는지 빠르게 확인</strong>하는 것이 목적입니다.
+       실제 서식은 결과 파일을 한글에서 열었을 때 원본 그대로 유지됩니다.</p>
 
-      <h2><span class="step-num">3</span> HWP로 저장</h2>
-      <p>편집이 완료된 문서를 HWP 파일로 저장하려면 상단 우측의 「저장」 버튼을 클릭하세요. 파일이 자동으로 다운로드됩니다.</p>
-      <div class="tip">💡 HWPX 파일을 열었더라도 저장 시 .hwp 형식으로 변환되어 다운로드됩니다.</div>
+    <h2>3. 처리 시간 보기</h2>
+    <p>주소 뒤에 <code>?debug=1</code>을 붙이면 파일 읽기부터 화면 표시까지 각 단계에 걸린 시간이 표시됩니다.</p>
 
-      <h2><span class="step-num">4</span> PDF로 내보내기</h2>
-      <p>문서를 PDF 형식으로 내보내려면 상단의 「PDF」 버튼을 클릭하세요. 브라우저의 인쇄 기능을 통해 PDF로 저장할 수 있습니다.</p>
-      <ul>
-        <li>「PDF」 버튼 클릭 → 인쇄 다이얼로그 열림</li>
-        <li>대상(프린터)에서 「PDF로 저장」 또는 「Microsoft Print to PDF」 선택</li>
-        <li>「저장」 클릭</li>
-      </ul>
+    <h2>구형 .hwp 파일이라면</h2>
+    <p>rhwp는 <code>.hwpx</code>만 지원합니다. 구형 <code>.hwp</code>는 한글에서
+       <em>파일 → 다른 이름으로 저장</em>을 누르고 형식을 <strong>HWPX</strong>로 지정해 저장한 뒤 올려 주세요.</p>
 
-      <div class="related">
-        관련 페이지: <a href="/faq/">자주 묻는 질문</a><a href="/about/">서비스 소개</a>
-      </div>
-      <a href="/" class="cta">편집기 바로 사용하기</a>
-    </div>
-  </div>
+    <h2>잘 처리되는 문서</h2>
+    <ul>
+      <li>일반 문단으로 이루어진 공문, 보고서, 제안서</li>
+      <li>표 안에 항목과 값이 들어간 양식</li>
+      <li>이미지나 로고가 들어 있는 문서 — 이미지는 그대로 보존됩니다</li>
+    </ul>
 
-  <script type="module" src="/components/layout.js"></script>
+    <h2>아직 확인이 필요한 문서</h2>
+    <ul>
+      <li>고정 크기 글상자에 긴 내용이 들어가는 양식</li>
+      <li>머리말과 꼬리말, 각주, 메모 안의 텍스트</li>
+      <li>차트나 수식이 본문 흐름에 섞여 있는 문서</li>
+    </ul>
+    <p class="doc-cta"><a class="btn btn--primary" href="/">HWPX 열어보기</a></p>
+  </main>
+  <footer class="footer">
+    <a href="/privacy/">개인정보처리방침</a><span>·</span><a href="/about/">서비스 소개</a>
+  </footer>
 </body>
 </html>
