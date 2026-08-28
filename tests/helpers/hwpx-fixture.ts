@@ -9,9 +9,9 @@ import { buildZip, type BuildEntry } from './zip-builder'
 
 const NS = [
   'xmlns:ha="http://www.hancom.co.kr/hwpml/2011/app"',
+  'xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core"',
   'xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"',
   'xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"',
-  'xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core"',
   'xmlns:hh="http://www.hancom.co.kr/hwpml/2011/head"',
 ].join(' ')
 
@@ -47,6 +47,21 @@ export function cell(inner: string, col = 0, row = 0): string {
   )
 }
 
+/** 실제 한글이 만드는 형태와 같은 그림. 크기와 참조 id가 자식 요소로 들어온다. */
+export function picture(binaryItemId = 'image1', width = 43371, height = 18403): string {
+  return (
+    `<hp:pic id="1161408219" zOrder="9" numberingType="PICTURE" ` +
+    `textWrap="TOP_AND_BOTTOM" lock="0" groupLevel="0" reverse="0">` +
+    '<hp:offset x="0" y="0"/>' +
+    '<hp:orgSz width="118800" height="50400"/>' +
+    `<hp:curSz width="${width}" height="${height}"/>` +
+    '<hp:flip horizontal="0" vertical="0"/>' +
+    `<hc:img binaryItemIDRef="${binaryItemId}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>` +
+    '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="118800" y="0"/></hp:imgRect>' +
+    '</hp:pic>'
+  )
+}
+
 export function table(rows: string[]): string {
   const body = rows.map((row) => `<hp:tr>${row}</hp:tr>`).join('')
   return (
@@ -78,7 +93,9 @@ export const SECTION_BODY = [
       ]),
     ),
   ),
-  // 7) 표 뒤의 일반 문단.
+  // 7) 그림. 본문 흐름 안의 run에 들어간다.
+  para(run(picture())),
+  // 8) 표 뒤의 일반 문단.
   para(run(text('문의: 담당자 ☎ 02-000-0000'))),
 ].join('')
 
@@ -99,8 +116,11 @@ const VERSION_XML =
 const CONTENT_HPF =
   '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' +
   '<opf:package xmlns:opf="http://www.idpf.org/2007/opf/"><opf:metadata/>' +
-  '<opf:manifest><opf:item id="section0" href="Contents/section0.xml" ' +
-  'media-type="application/xml"/></opf:manifest></opf:package>'
+  '<opf:manifest>' +
+  '<opf:item id="header" href="Contents/header.xml" media-type="application/xml"/>' +
+  '<opf:item id="image1" href="BinData/image1.png" media-type="image/png" isEmbeded="1"/>' +
+  '<opf:item id="section0" href="Contents/section0.xml" media-type="application/xml"/>' +
+  '</opf:manifest></opf:package>'
 
 const CONTAINER_XML =
   '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' +
@@ -113,7 +133,7 @@ export interface FixtureOptions {
   /** 필수 항목 중 일부를 빼서 오류 처리를 검증할 때 사용. */
   omit?: string[]
   mimetype?: string
-  /** 용량이 큰 이미지가 있어도 미리보기가 느려지지 않는지 확인할 때. */
+  /** 그림 바이트 크기. 기본값에서도 작은 그림 하나가 들어간다. */
   imageBytes?: number
 }
 
@@ -127,12 +147,13 @@ export async function buildHwpx(options: FixtureOptions = {}): Promise<Uint8Arra
   sections.forEach((xml, index) => {
     entries.push({ name: `Contents/section${index}.xml`, data: xml })
   })
-  if (options.imageBytes) {
-    // 압축이 잘 되지 않는 데이터로 채워 실제 이미지에 가깝게 만든다.
-    const image = new Uint8Array(options.imageBytes)
-    for (let i = 0; i < image.length; i += 1) image[i] = (i * 2654435761) & 0xff
-    entries.push({ name: 'BinData/image1.png', data: image, stored: true })
-  }
+  // 압축이 잘 되지 않는 데이터로 채워 실제 이미지에 가깝게 만든다.
+  // PNG처럼 이미 압축된 포맷은 한글도 무압축(stored)으로 넣는다.
+  const imageSize = Math.max(options.imageBytes ?? 2048, 64)
+  const image = new Uint8Array(imageSize)
+  image.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  for (let i = 8; i < image.length; i += 1) image[i] = (i * 2654435761) & 0xff
+  entries.push({ name: 'BinData/image1.png', data: image, stored: true })
   entries.push(
     { name: 'Contents/content.hpf', data: CONTENT_HPF },
     { name: 'META-INF/container.xml', data: CONTAINER_XML },

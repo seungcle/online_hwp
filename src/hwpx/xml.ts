@@ -214,6 +214,11 @@ export function tagBytes(name: string): Uint8Array {
   return encoder.encode(name)
 }
 
+/** XML 문자 데이터로 다시 쓸 때 필요한 이스케이프. */
+export function escapeXmlText(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 const NAMED_ENTITIES: Record<string, string> = {
   amp: '&',
   lt: '<',

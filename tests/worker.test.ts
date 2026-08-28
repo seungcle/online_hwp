@@ -1,0 +1,198 @@
+/** Worker: OpenAI 프록시와 자산 라우팅. 실제 OpenAI를 부르지 않는다. */
+
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import worker from '../worker/index'
+
+const realFetch = globalThis.fetch
+
+afterEach(() => {
+  globalThis.fetch = realFetch
+  vi.restoreAllMocks()
+})
+
+interface FakeEnv {
+  ASSETS: { fetch(request: Request): Promise<Response> }
+  OPENAI_API_KEY?: string
+  OPENAI_MODEL?: string
+}
+
+function env(overrides: Partial<FakeEnv> = {}): FakeEnv {
+  return {
+    ASSETS: {
+      fetch: async (request: Request) => {
+        const path = new URL(request.url).pathname
+        if (path.endsWith('.html')) {
+          return new Response(null, {
+            status: 307,
+            headers: { location: path.replace(/\.html$/, '') },
+          })
+        }
+        return new Response('정적 자산', { status: 200, headers: { 'content-type': 'text/plain' } })
+      },
+    },
+    ...overrides,
+  }
+}
+
+const validBody = {
+  instruction: '기간을 3개월로 바꿔줘',
+  paragraphs: [{ id: 's0-p0', text: '사업 기간은 1년 입니다.', where: '본문' }],
+}
+
+function post(body: unknown): Request {
+  const json = JSON.stringify(body)
+  return new Request('https://rhwp.co.kr/api/edit-plan', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'content-length': String(json.length) },
+    body: json,
+  })
+}
+
+function openAiReply(content: unknown): Response {
+  return new Response(
+    JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  )
+}
+
+describe('/api/edit-plan', () => {
+  it('키가 없으면 503과 안내 메시지를 준다', async () => {
+    const response = await worker.fetch(post(validBody), env())
+    expect(response.status).toBe(503)
+    const body = await response.json()
+    expect(body.error.code).toBe('not_configured')
+  })
+
+  it('GET을 거부한다', async () => {
+    const request = new Request('https://rhwp.co.kr/api/edit-plan')
+    const response = await worker.fetch(request, env({ OPENAI_API_KEY: 'k' }))
+    expect(response.status).toBe(405)
+  })
+
+  it('형식이 틀린 요청을 400으로 거부한다', async () => {
+    const response = await worker.fetch(post({ nope: true }), env({ OPENAI_API_KEY: 'k' }))
+    expect(response.status).toBe(400)
+  })
+
+  it('빈 요청 문구를 거부한다', async () => {
+    const response = await worker.fetch(
+      post({ ...validBody, instruction: '  ' }),
+      env({ OPENAI_API_KEY: 'k' }),
+    )
+    expect(response.status).toBe(400)
+    expect((await response.json()).error.message).toMatch(/비어 있습니다/)
+  })
+
+  it('정상 응답을 그대로 전달한다', async () => {
+    const plan = {
+      summary: '기간을 바꿨습니다.',
+      operations: [
+        { paragraphId: 's0-p0', oldText: '사업 기간은 1년 입니다.', newText: '사업 기간은 3개월입니다.', reason: '요청' },
+      ],
+    }
+    globalThis.fetch = vi.fn(async () => openAiReply(plan)) as never
+    const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual(plan)
+  })
+
+  it('API 키를 OpenAI에만 보내고 응답에는 담지 않는다', async () => {
+    const spy = vi.fn(async () => openAiReply({ summary: 's', operations: [] }))
+    globalThis.fetch = spy as never
+    const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'secret-key' }))
+
+    const [url, init] = spy.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.openai.com/v1/chat/completions')
+    expect((init.headers as Record<string, string>)['authorization']).toBe('Bearer secret-key')
+    expect(await response.text()).not.toContain('secret-key')
+  })
+
+  it('Structured Outputs 스키마를 강제한다', async () => {
+    const spy = vi.fn(async () => openAiReply({ summary: 's', operations: [] }))
+    globalThis.fetch = spy as never
+    await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
+    const init = (spy.mock.calls[0] as unknown as [string, RequestInit])[1]
+    const sent = JSON.parse(init.body as string)
+    expect(sent.response_format.type).toBe('json_schema')
+    expect(sent.response_format.json_schema.strict).toBe(true)
+    // 문단 id와 텍스트만 담기고 파일 바이트는 없다.
+    expect(sent.messages[1].content).toContain('[s0-p0]')
+    expect(sent.messages[1].content).toContain('사업 기간은 1년 입니다.')
+  })
+
+  it('모델을 환경변수로 바꿀 수 있다', async () => {
+    const spy = vi.fn(async () => openAiReply({ summary: 's', operations: [] }))
+    globalThis.fetch = spy as never
+    await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k', OPENAI_MODEL: 'gpt-5' }))
+    const init = (spy.mock.calls[0] as unknown as [string, RequestInit])[1]
+    expect(JSON.parse(init.body as string).model).toBe('gpt-5')
+  })
+
+  it('OpenAI 오류를 502로 감싼다', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('nope', { status: 500 })) as never
+    const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
+    expect(response.status).toBe(502)
+    expect((await response.json()).error.code).toBe('upstream_error')
+  })
+
+  it('요청 제한(429)은 다시 시도하라고 안내한다', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('rate', { status: 429 })) as never
+    const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
+    expect((await response.json()).error.message).toMatch(/잠시 후/)
+  })
+
+  it('타임아웃을 504로 처리한다', async () => {
+    globalThis.fetch = vi.fn(async () => {
+      const error = new Error('aborted')
+      error.name = 'AbortError'
+      throw error
+    }) as never
+    const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
+    expect(response.status).toBe(504)
+    expect((await response.json()).error.code).toBe('timeout')
+  })
+
+  it('AI가 거절하면 이유를 전달한다', async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ choices: [{ message: { refusal: '불가' } }] }), {
+          status: 200,
+        }),
+    ) as never
+    const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
+    expect(response.status).toBe(422)
+  })
+
+  it('스키마에 맞지 않는 응답을 502로 막는다', async () => {
+    globalThis.fetch = vi.fn(async () => openAiReply({ 아무거나: true })) as never
+    const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
+    expect(response.status).toBe(502)
+    expect((await response.json()).error.code).toBe('invalid_plan')
+  })
+
+  it('JSON이 아닌 content를 502로 막는다', async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ choices: [{ message: { content: '그냥 문장' } }] }), {
+          status: 200,
+        }),
+    ) as never
+    const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
+    expect(response.status).toBe(502)
+  })
+})
+
+describe('자산 라우팅', () => {
+  it('네이버 소유확인 파일을 리다이렉트 없이 200으로 준다', async () => {
+    const request = new Request('https://rhwp.co.kr/naver800b4c92f864ba320117cb2d90df370e.html')
+    const response = await worker.fetch(request, env())
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('정적 자산')
+  })
+
+  it('나머지 경로는 정적 자산이 그대로 처리한다', async () => {
+    const response = await worker.fetch(new Request('https://rhwp.co.kr/guide/'), env())
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('정적 자산')
+  })
+})

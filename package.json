@@ -6,9 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "dev:worker": "wrangler dev",
     "preview": "vite preview",
+    "check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sample:edit": "esbuild scripts/make-sample-output.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/sample-output.mjs --log-level=warning && node node_modules/.cache/sample-output.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

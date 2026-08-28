@@ -87,7 +87,7 @@ describe('미리보기 추출 성능', () => {
     const withoutImage = await measure(1000, 20)
     const withImage = await measure(1000, 20, 10_000_000)
     console.log(
-      `[perf] 이미지 없음 ${withoutImage.totalMs.toFixed(1)}ms / ` +
+      `[perf] 작은 이미지 ${withoutImage.totalMs.toFixed(1)}ms / ` +
         `10MB 이미지 포함 ${withImage.totalMs.toFixed(1)}ms ` +
         `(펼친 바이트 ${withImage.result.meta.inflatedBytes})`,
     )

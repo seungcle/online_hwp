@@ -17,11 +17,11 @@ function wrap(body: string): string {
 }
 
 const texts = (blocks: readonly Block[]): string[] =>
-  blocks.flatMap((block) =>
-    block.kind === 'paragraph'
-      ? [block.text]
-      : block.rows.flatMap((row) => row.flatMap((c) => texts(c.blocks))),
-  )
+  blocks.flatMap((block) => {
+    if (block.kind === 'paragraph') return [block.text]
+    if (block.kind === 'image') return []
+    return block.rows.flatMap((row) => row.flatMap((c) => texts(c.blocks)))
+  })
 
 describe('parseSection', () => {
   const section = sectionOf(SECTION_XML)

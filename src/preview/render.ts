@@ -9,7 +9,7 @@
  * 노드를 하나씩 만드는 것보다 눈에 띄게 빠르다.
  */
 
-import type { Block, DocumentModel, Paragraph, Table } from '../hwpx/document'
+import { HWPUNIT_PER_PX, type Block, type DocumentModel, type ImageBlock, type Paragraph, type Table } from '../hwpx/document'
 
 const ESCAPE_PATTERN = /[&<>"]/g
 const ESCAPES: Record<string, string> = {
@@ -36,7 +36,8 @@ export function renderDocument(model: DocumentModel): string {
 function renderBlocks(blocks: readonly Block[], out: string[]): void {
   for (const block of blocks) {
     if (block.kind === 'paragraph') renderParagraph(block, out)
-    else renderTable(block, out)
+    else if (block.kind === 'table') renderTable(block, out)
+    else renderImage(block, out)
   }
 }
 
@@ -48,6 +49,22 @@ function renderParagraph(paragraph: Paragraph, out: string[]): void {
   const split = paragraph.split ? ' data-split="1"' : ''
   out.push(
     `<p class="pv-p" data-id="${paragraph.id}"${split}>${escapeHtml(paragraph.text)}</p>`,
+  )
+}
+
+/**
+ * 이미지는 자리와 크기만 먼저 잡아 두고 실제 바이트는 나중에 채운다.
+ * 초기 미리보기 속도를 지키기 위해서다 — 화면에 들어올 때 `src`가 붙는다.
+ * width/height를 미리 넣어 두면 이미지가 로드될 때 레이아웃이 흔들리지 않는다.
+ */
+function renderImage(image: ImageBlock, out: string[]): void {
+  if (!image.binaryItemId) return
+  const width = Math.round(image.width / HWPUNIT_PER_PX)
+  const height = Math.round(image.height / HWPUNIT_PER_PX)
+  const size = width > 0 && height > 0 ? ` width="${width}" height="${height}"` : ''
+  out.push(
+    `<img class="pv-img" data-image-id="${escapeHtml(image.binaryItemId)}"${size} ` +
+      `alt="문서에 포함된 이미지" loading="lazy" decoding="async">`,
   )
 }
 

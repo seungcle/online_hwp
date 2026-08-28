@@ -10,3 +10,7 @@ fixtures/local/
 
 # 로컬 개발 편의 설정
 .claude/
+fixtures/output/
+
+# wrangler 로컬 상태
+.wrangler/

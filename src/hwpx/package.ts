@@ -9,6 +9,7 @@
 import { Stopwatch } from '../perf'
 import { ZipArchive, ZipError } from './zip'
 import { buildDocumentModel, parseSection, type DocumentModel, type SectionModel } from './document'
+import { parseManifest, type ManifestItem } from './manifest'
 
 export class HwpxError extends Error {
   override name = 'HwpxError'
@@ -43,6 +44,12 @@ export interface LoadResult {
   readonly timings: ReturnType<Stopwatch['report']>
   /** 원본 바이트. patch engine이 그대로 재사용한다. */
   readonly source: Uint8Array
+  /** 열려 있는 ZIP. 이미지 지연 로딩과 재패키징에 그대로 쓴다. */
+  readonly archive: ZipArchive
+  /** section 파일 이름 → 압축을 푼 XML 바이트. */
+  readonly sectionBytes: Map<string, Uint8Array>
+  /** content.hpf manifest. 그림 id → 실제 ZIP 경로. */
+  readonly manifest: Map<string, ManifestItem>
 }
 
 export async function loadHwpx(file: File, watch = new Stopwatch()): Promise<LoadResult> {
@@ -101,17 +108,17 @@ export async function loadHwpxBytes(
     throw new HwpxError('본문(Contents/section*.xml)을 찾지 못했습니다.')
   }
 
-  const payloads: Uint8Array[] = []
+  const sectionBytes = new Map<string, Uint8Array>()
   let inflatedBytes = 0
   for (const entry of sectionEntries) {
     const bytes = await archive.read(entry)
     inflatedBytes += bytes.byteLength
-    payloads.push(bytes)
+    sectionBytes.set(entry.name, bytes)
   }
   watch.lap('본문 압축 해제')
 
-  const sections: SectionModel[] = payloads.map((bytes, index) =>
-    parseSection(bytes, index, sectionEntries[index]!.name),
+  const sections: SectionModel[] = sectionEntries.map((entry, index) =>
+    parseSection(sectionBytes.get(entry.name)!, index, entry.name),
   )
   watch.lap('XML 파싱')
 
@@ -127,7 +134,17 @@ export async function loadHwpxBytes(
     application: await readApplication(archive),
   }
 
-  return { model, meta, timings: watch.report(), source: buffer }
+  const manifest = parseManifest(await archive.read('Contents/content.hpf'))
+
+  return {
+    model,
+    meta,
+    timings: watch.report(),
+    source: buffer,
+    archive,
+    sectionBytes,
+    manifest,
+  }
 }
 
 async function readApplication(archive: ZipArchive): Promise<string | undefined> {

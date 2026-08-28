@@ -79,6 +79,62 @@ describe.skipIf(samples.length === 0)('실제 HWPX 샘플', () => {
         }
       })
 
+      it('실제 문서를 수정해도 이미지와 ZIP 구조가 그대로 남는다', async () => {
+        const { HwpxDocument } = await import('../src/hwpx/session')
+        const { ZipArchive } = await import('../src/hwpx/zip')
+        const loaded = await loadHwpxBytes(bytes, name)
+        const document = HwpxDocument.fromLoadResult(loaded)
+
+        // 여러 조각으로 갈라진 문단을 우선 고른다. 가장 위험한 경로다.
+        const paragraphs = document.model.sections.flatMap((section) => section.paragraphs)
+        const targets = [
+          paragraphs.find((p) => p.split && p.text.trim().length > 4),
+          paragraphs.find((p) => !p.split && p.text.trim().length > 4),
+        ].filter((p): p is NonNullable<typeof p> => p !== undefined)
+        if (targets.length === 0) return
+
+        document.apply({
+          summary: '테스트',
+          operations: targets.map((paragraph) => ({
+            type: 'replace_text' as const,
+            paragraphId: paragraph.id,
+            oldText: paragraph.text,
+            newText: `[변경] ${paragraph.text}`,
+          })),
+        })
+        const output = await document.toBytes()
+
+        const before = ZipArchive.open(bytes)
+        const after = ZipArchive.open(output)
+        expect(after.entries.map((e) => e.name)).toEqual(before.entries.map((e) => e.name))
+        expect(after.entries.map((e) => e.compressionMethod)).toEqual(
+          before.entries.map((e) => e.compressionMethod),
+        )
+
+        const changed: string[] = []
+        for (const entry of before.entries) {
+          const oldBytes = await before.read(entry.name)
+          const newBytes = await after.read(entry.name)
+          if (!indexedEqual(oldBytes, newBytes)) changed.push(entry.name)
+        }
+        // 본문 XML 말고는 아무것도 바뀌면 안 된다. 이미지 포함.
+        expect(changed.every((entry) => /^Contents\/section\d+\.xml$/.test(entry))).toBe(true)
+        expect(changed.length).toBeGreaterThan(0)
+
+        // 결과 파일이 다시 열리고 수정이 반영돼 있어야 한다.
+        const reopened = await loadHwpxBytes(output, `${name} (수정)`)
+        const reopenedTexts = reopened.model.sections.flatMap((section) =>
+          section.paragraphs.map((paragraph) => paragraph.text),
+        )
+        for (const paragraph of targets) {
+          expect(reopenedTexts).toContain(`[변경] ${paragraph.text}`)
+        }
+        for (const section of reopened.model.sections) {
+          const xml = ZipArchive.open(output)
+          ET_wellFormed(await xml.read(section.name))
+        }
+      })
+
       it('미리보기 HTML을 만든다', async () => {
         const result = await loadHwpxBytes(bytes, name)
         const html = renderDocument(result.model)
@@ -88,6 +144,23 @@ describe.skipIf(samples.length === 0)('실제 HWPX 샘플', () => {
     })
   }
 })
+
+function indexedEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.byteLength !== b.byteLength) return false
+  for (let i = 0; i < a.byteLength; i += 1) if (a[i] !== b[i]) return false
+  return true
+}
+
+/** 결과 XML이 well-formed인지 확인한다. 스캐너가 끝까지 읽히면 통과로 본다. */
+function ET_wellFormed(xml: Uint8Array): void {
+  let depth = 0
+  scanXml(xml, (token) => {
+    if (token.kind === TokenKind.Start) depth += 1
+    else if (token.kind === TokenKind.End) depth -= 1
+    expect(depth).toBeGreaterThanOrEqual(0)
+  })
+  expect(depth).toBe(0)
+}
 
 /**
  * 문서 모델(document.ts)을 거치지 않고 문단 텍스트를 다시 만든다.

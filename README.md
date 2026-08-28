@@ -6,12 +6,17 @@
 > 이 저장소는 이전의 `@rhwp/editor` 기반 HWP 온라인 편집기를 대체한다.
 > Git 이력, 도메인, Cloudflare 배포 연결은 그대로 쓰고 애플리케이션만 새로 만들었다.
 
-## 지금 되는 것 (마일스톤 1)
+## 지금 되는 것
 
-HWPX 업로드 → 구조 분석 → 경량 미리보기. 전부 브라우저 안에서 돌고
-서버로 가는 요청은 하나도 없다.
+```text
+HWPX 업로드 → 미리보기 → 자연어로 수정 요청 → AI가 수정 계획 작성
+→ 브라우저에서 검증 → 바이트 단위 patch → 수정본 내려받기
+```
 
-AI 수정은 다음 단계다. [docs/ROADMAP.md](docs/ROADMAP.md) 참고.
+**텍스트 편집만** 지원한다. 일반 문단과 표 안 텍스트를 바꾸고, 이미지·서식·
+표 구조·레이아웃은 손대지 않고 그대로 보존한다.
+
+HWPX 파일은 브라우저를 벗어나지 않는다. AI에는 문단 id와 텍스트만 보낸다.
 
 ## 실행
 
@@ -22,9 +27,11 @@ npm run dev
 
 | 명령 | 하는 일 |
 |---|---|
-| `npm run dev` | 개발 서버 |
+| `npm run dev` | 개발 서버 (UI만) |
+| `npm run dev:worker` | Worker 로컬 실행. `npm run dev`와 함께 띄우면 `/api`가 연결된다 |
 | `npm run build` | 타입 검사 후 `dist/` 생성 (배포용) |
 | `npm run test` | 테스트 |
+| `npm run sample:edit` | `fixtures/local/`의 실제 HWPX를 수정해 결과 파일 생성 |
 | `npm run preview` | 빌드 결과 확인 |
 
 `?debug=1`을 붙이면 단계별 처리 시간이 화면에 나온다. 개발 모드에서는 항상 나온다.
@@ -35,13 +42,20 @@ npm run dev
 
 ```text
 자연어 요청
-  → AI            (판단만: 어느 문단을 무엇으로 바꿀지)
-  → Edit Plan     (검증된 JSON)
-  → patch engine  (실제 파일 수정, 결정적)
+  → Worker (OpenAI 프록시, API 키는 Secret에만)
+  → Edit Plan  (Structured Outputs로 형태 강제)
+  → 브라우저에서 스키마 검증
+  → patch engine에서 oldText 대조 검증
+  → 바이트 단위 patch
   → 새 HWPX
 ```
 
-AI에게 HWPX XML을 만들거나 고치게 하지 않는다.
+AI에게 HWPX XML을 만들거나 고치게 하지 않는다. AI가 정하는 것은
+"어느 문단을 무엇으로 바꿀지"까지다.
+
+검증이 세 겹인 이유는 어느 하나만 뚫려도 문서가 망가지기 때문이다.
+`oldText`가 현재 문단 텍스트와 **한 글자라도** 다르면 그 계획은 통째로
+버려진다. 부분 적용은 하지 않는다.
 
 ### 가장 중요한 기술적 사실
 
@@ -72,9 +86,20 @@ src/
 │  ├─ xml.ts        바이트 오프셋을 유지하는 XML 스캐너
 │  ├─ document.ts   section XML → 문단/표 모델 (조각 인식)
 │  └─ package.ts    HWPX 검증 + 로딩 + 단계별 시간 측정
-├─ preview/render.ts  모델 → 경량 HTML
-├─ perf.ts            처리 시간 측정
-└─ main.ts            화면 연결
+│  ├─ patch.ts      Edit Plan 검증 + 바이트 구간 교체
+│  ├─ zip-writer.ts 재패키징. 안 바뀐 항목은 압축된 바이트 그대로 복사
+│  ├─ manifest.ts   content.hpf → 그림 id에서 실제 경로 찾기
+│  └─ session.ts    편집 중인 문서 한 건
+├─ ai/
+│  ├─ schema.ts     Edit Plan 스키마와 검증 (Worker와 공유)
+│  └─ client.ts     Worker 호출. 파일이 아니라 문단 텍스트만 보낸다
+├─ preview/
+│  ├─ render.ts     모델 → 경량 HTML
+│  └─ images.ts     이미지 지연 로딩
+├─ perf.ts          처리 시간 측정
+└─ main.ts          화면 연결
+
+worker/index.ts     OpenAI 프록시 + 소유확인 파일 라우팅
 ```
 
 의존성은 개발용(TypeScript, Vite, Vitest)뿐이다. 런타임 의존성은 없다.
@@ -129,6 +154,21 @@ Worker 이름 `online-hwp`은 `rhwp.co.kr` 도메인이 붙어 있는 기존 서
 npm run build && npx wrangler deploy --dry-run
 ```
 
+### AI 기능에 필요한 Secret
+
+키가 없으면 `/api/edit-plan`이 503과 함께 "설정되지 않았습니다"를 돌려주고,
+업로드·미리보기·내려받기는 그대로 동작한다.
+
+```bash
+npx wrangler secret put OPENAI_API_KEY
+```
+
+모델을 바꾸려면(기본 `gpt-4.1-mini`):
+
+```bash
+npx wrangler secret put OPENAI_MODEL
+```
+
 `ads.txt`, 네이버 사이트 인증, `robots.txt`, `sitemap.xml`, 파비콘은
 도메인에 묶인 자산이라 그대로 유지했다.
 
@@ -137,6 +177,10 @@ npm run build && npx wrangler deploy --dry-run
 - `.hwpx` 전용. 구형 `.hwp`(OLE 바이너리)는 지원하지 않고, 열면 변환 안내를 띄운다.
 - 미리보기는 글꼴·색·정렬·페이지 나눔을 재현하지 않는다. 내용 확인이 목적이다.
 - 머리말·꼬리말, 각주, 메모, 글상자 안의 텍스트는 아직 다루지 않는다.
+- 이미지는 **보여 주기만** 한다. 생성·삽입·삭제·교체·이동·크기 조정을 하지 않는다.
+- 표 구조(행·열 추가/삭제/병합)와 도형·레이아웃은 바꾸지 않는다.
+- 문단을 나누거나 합칠 수 없다. 수정 텍스트의 줄바꿈은 공백으로 바뀐다.
+- 빈 문단에는 글자를 넣을 수 없다(넣을 자리가 되는 run이 없기 때문).
 - ZIP64 아카이브와 XML CDATA는 지원하지 않는다(HWPX에서 관측되지 않았고,
   만나면 조용히 넘기지 않고 오류를 낸다).
 - `DecompressionStream`이 없는 구형 브라우저에서는 동작하지 않는다.
