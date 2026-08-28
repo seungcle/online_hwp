@@ -124,6 +124,11 @@ async function handleEditPlan(request: Request, env: Env): Promise<Response> {
     if (!upstream.ok) {
       const detail = await upstream.text()
       console.error('openai error', upstream.status, detail.slice(0, 500))
+      if (upstream.status === 401 || upstream.status === 403) {
+        // 로컬에서 .dev.vars 자리표시자를 그대로 둔 경우가 대부분이다.
+        // 원인을 감추면 "AI 서비스 오류"만 보고 한참 헤매게 된다.
+        return fail(502, 'bad_key', 'OpenAI API 키가 올바르지 않습니다.')
+      }
       return fail(
         502,
         'upstream_error',

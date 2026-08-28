@@ -97,6 +97,19 @@ describe('/api/edit-plan', () => {
     expect(await response.json()).toEqual(plan)
   })
 
+  it('키가 틀리면 원인을 그대로 알려 준다', async () => {
+    // 로컬에서 .dev.vars 자리표시자를 그대로 둔 경우. "AI 서비스 오류"로
+    // 뭉뚱그리면 원인을 찾는 데 한참 걸린다.
+    globalThis.fetch = vi.fn(
+      async () => new Response('{"error":{"code":"invalid_api_key"}}', { status: 401 }),
+    ) as never
+    const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'sk-REPLACE_ME' }))
+    expect(response.status).toBe(502)
+    const body = await response.json()
+    expect(body.error.code).toBe('bad_key')
+    expect(body.error.message).toMatch(/키가 올바르지 않습니다/)
+  })
+
   it('API 키를 OpenAI에만 보내고 응답에는 담지 않는다', async () => {
     const spy = vi.fn(async () => openAiReply({ summary: 's', operations: [] }))
     globalThis.fetch = spy as never

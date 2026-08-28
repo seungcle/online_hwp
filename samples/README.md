@@ -23,6 +23,7 @@ npm run dev:worker                # 다른 터미널
 npm run ai:check
 npm run ai:check -- "기간을 3개월로 바꿔줘"
 AI_CHECK_URL=https://rhwp.co.kr/api/edit-plan npm run ai:check   # 실서비스 대상
+HWPX_SAMPLE_FILE=proposal.hwpx npm run ai:check                  # 파일 지정. 기본은 제일 큰 것
 ```
 
 보는 것은 두 가지다. **검증코드가 전부 맞는가**(모델이 문단을 제대로 짚었는가)와

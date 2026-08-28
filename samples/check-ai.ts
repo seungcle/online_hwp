@@ -20,7 +20,7 @@
  * 장치가 실제 모델 응답에도 통하는지 본다.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { loadHwpxBytes } from '../frontend/src/hwpx/package'
 import { HwpxDocument } from '../frontend/src/hwpx/session'
@@ -37,9 +37,14 @@ if (!existsSync(inputDir)) {
   console.error(`${inputDir} 가 없습니다. 실제 .hwpx를 넣어 주세요.`)
   process.exit(1)
 }
-const [file] = readdirSync(inputDir)
-  .filter((name) => name.toLowerCase().endsWith('.hwpx'))
-  .sort((a, b) => b.length - a.length)
+// 기본값은 제일 큰 파일이다. 문단이 많고 서식이 복잡한 쪽이 확인할 것이 많다.
+// 특정 파일을 보려면 HWPX_SAMPLE_FILE=이름.hwpx.
+const chosen = process.env['HWPX_SAMPLE_FILE']
+const [file] = chosen
+  ? [chosen]
+  : readdirSync(inputDir)
+      .filter((name) => name.toLowerCase().endsWith('.hwpx'))
+      .sort((a, b) => statSync(join(inputDir, b)).size - statSync(join(inputDir, a)).size)
 if (!file) {
   console.error(`${inputDir} 에 .hwpx 파일이 없습니다.`)
   process.exit(1)
