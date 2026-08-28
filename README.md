@@ -112,11 +112,21 @@ HWPX_FIXTURE_DIR=~/hwpx-samples npm run test
 
 ## 배포
 
-Cloudflare에 연결된 기존 파이프라인을 그대로 쓴다.
-빌드 명령(`npm run build`)과 출력 디렉터리(`dist/`)를 바꾸지 않았다.
+Cloudflare Workers Builds가 GitHub `master` push를 받아 자동 배포한다.
+
+| 단계 | 명령 |
+|---|---|
+| 빌드 | `npm run build` → `dist/` |
+| 배포 | `npx wrangler deploy` (설정: [`wrangler.jsonc`](wrangler.jsonc)) |
+
+빌드 명령과 출력 디렉터리는 이전과 동일하게 유지했다.
+`wrangler.jsonc`는 배포 대상(`dist/`)과 SPA fallback 동작을 명시한다.
+Worker 이름 `online-hwp`은 `rhwp.co.kr` 도메인이 붙어 있는 기존 서비스 이름이므로 바꾸면 안 된다.
+
+배포 전 설정 확인:
 
 ```bash
-npm run build   # dist/ 생성
+npm run build && npx wrangler deploy --dry-run
 ```
 
 `ads.txt`, 네이버 사이트 인증, `robots.txt`, `sitemap.xml`, 파비콘은

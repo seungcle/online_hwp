@@ -1,0 +1,15 @@
+{
+  // Cloudflare Workers Builds가 `npx wrangler deploy`로 배포한다.
+  // 이 설정이 저장소에 없으면 배포 단계에서 대상(assets 디렉터리)을 못 찾는다.
+  // Worker 이름은 기존에 붙어 있는 서비스 이름을 그대로 써야 rhwp.co.kr 연결이 유지된다.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "online-hwp",
+  "compatibility_date": "2026-06-19",
+  "observability": { "enabled": true },
+  "assets": {
+    // `npm run build`의 출력. 실행할 Worker 스크립트는 없고 정적 자산만 올린다.
+    "directory": "./dist",
+    // 없는 경로에서 index.html을 200으로 돌려주던 기존 동작을 유지한다.
+    "not_found_handling": "single-page-application"
+  }
+}
