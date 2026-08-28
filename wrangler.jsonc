@@ -6,8 +6,15 @@
   "main": "backend/index.ts",
   "compatibility_date": "2026-06-19",
   "observability": { "enabled": true },
-  // 알려진 양식 저장소. 원본 HWPX·이미지·본문은 넣지 않는다. 스키마는 migrations/.
-  // 바인딩이 없어도 서비스는 돈다 — 매번 처음 보는 문서로 처리될 뿐이다.
+  // 알려진 양식 저장소. 원본 HWPX·이미지·본문은 넣지 않는다(ADR 0002).
+  // 스키마는 migrations/. 바인딩이 없어도 서비스는 돈다 — 매번 처음 보는 문서로
+  // 처리될 뿐이다.
+  //
+  // ⚠ database_id 는 계정마다 다르다. 아래 값이 그대로면 `wrangler deploy` 가 실패한다.
+  //   1) npx wrangler login
+  //   2) npx wrangler d1 create rhwp-templates      ← 출력된 database_id 를 아래에 붙인다
+  //   3) npm run db:remote                          ← 운영 D1 에 스키마 적용
+  //   4) npm run db:local                           ← 로컬 개발용
   "d1_databases": [
     {
       "binding": "TEMPLATES",
