@@ -4,11 +4,11 @@
 
 import { describe, expect, it } from 'vitest'
 import { buildHwpx, SECTION_XML } from './helpers/hwpx-fixture'
-import { loadHwpxBytes } from '../src/hwpx/package'
-import { HwpxDocument } from '../src/hwpx/session'
-import { PatchError, applyPlan, validatePlan, type EditPlan } from '../src/hwpx/patch'
-import { parseSection, type Block, type Paragraph } from '../src/hwpx/document'
-import { ZipArchive } from '../src/hwpx/zip'
+import { loadHwpxBytes } from '../frontend/src/hwpx/package'
+import { HwpxDocument } from '../frontend/src/hwpx/session'
+import { PatchError, applyPlan, validatePlan, type EditPlan } from '../frontend/src/hwpx/patch'
+import { parseSection, type Block, type Paragraph } from '../frontend/src/hwpx/document'
+import { ZipArchive } from '../frontend/src/hwpx/zip'
 
 const encode = (value: string): Uint8Array => new TextEncoder().encode(value)
 const decode = (value: Uint8Array): string => new TextDecoder().decode(value)

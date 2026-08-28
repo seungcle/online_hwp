@@ -7,8 +7,8 @@
 
 import { describe, expect, it } from 'vitest'
 import { buildHwpx, cell, para, run, table, text } from './helpers/hwpx-fixture'
-import { loadHwpxBytes } from '../src/hwpx/package'
-import { renderDocument } from '../src/preview/render'
+import { loadHwpxBytes } from '../frontend/src/hwpx/package'
+import { renderDocument } from '../frontend/src/preview/render'
 
 const NS = [
   'xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"',

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildHwpx, buildHwpxFile, SECTION_XML } from './helpers/hwpx-fixture'
 import { buildZip } from './helpers/zip-builder'
-import { HwpxError, loadHwpx, loadHwpxBytes } from '../src/hwpx/package'
+import { HwpxError, loadHwpx, loadHwpxBytes } from '../frontend/src/hwpx/package'
 
 describe('loadHwpx', () => {
   it('정상 HWPX를 열고 문서 모델을 만든다', async () => {

@@ -2,7 +2,7 @@
  * 합성 HWPX fixture.
  *
  * 실제 한글 문서를 조사하면서 관찰한 형태를 그대로 재현한다.
- * 실제 사내 문서는 저장소에 커밋하지 않는다(`fixtures/local/` 참고).
+ * 실제 사내 문서는 저장소에 커밋하지 않는다(`samples/local/` 참고).
  */
 
 import { buildZip, type BuildEntry } from './zip-builder'

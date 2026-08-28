@@ -1,7 +1,7 @@
 /** Worker: OpenAI 프록시와 자산 라우팅. 실제 OpenAI를 부르지 않는다. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import worker from '../worker/index'
+import worker from '../backend/index'
 
 const realFetch = globalThis.fetch
 

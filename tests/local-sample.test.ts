@@ -1,19 +1,19 @@
 /**
  * 실제 한글이 만든 HWPX에 대한 통합 테스트.
  *
- * 사내 문서는 저장소에 커밋하지 않는다. `fixtures/local/`(gitignore 대상)에
+ * 사내 문서는 저장소에 커밋하지 않는다. `samples/local/`(gitignore 대상)에
  * `.hwpx`를 넣으면 자동으로 돌고, 없으면 통째로 건너뛴다.
- * 다른 위치를 쓰려면 `HWPX_FIXTURE_DIR` 환경변수를 지정한다.
+ * 다른 위치를 쓰려면 `HWPX_SAMPLE_DIR` 환경변수를 지정한다.
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loadHwpxBytes } from '../src/hwpx/package'
-import { renderDocument } from '../src/preview/render'
-import { scanXml, TokenKind, slice, decodeXmlText } from '../src/hwpx/xml'
+import { loadHwpxBytes } from '../frontend/src/hwpx/package'
+import { renderDocument } from '../frontend/src/preview/render'
+import { scanXml, TokenKind, slice, decodeXmlText } from '../frontend/src/hwpx/xml'
 
-const directory = resolve(process.env['HWPX_FIXTURE_DIR'] ?? 'fixtures/local')
+const directory = resolve(process.env['HWPX_SAMPLE_DIR'] ?? 'samples/local')
 const samples = existsSync(directory)
   ? readdirSync(directory).filter((name) => name.toLowerCase().endsWith('.hwpx'))
   : []
@@ -39,7 +39,7 @@ describe.skipIf(samples.length === 0)('실제 HWPX 샘플', () => {
 
       it('본문 XML만 펼치고 BinData 등 나머지는 건드리지 않는다', async () => {
         const result = await loadHwpxBytes(bytes, name)
-        const { ZipArchive } = await import('../src/hwpx/zip')
+        const { ZipArchive } = await import('../frontend/src/hwpx/zip')
         const archive = ZipArchive.open(bytes)
         const sectionBytes = result.meta.sectionNames.reduce(
           (sum, sectionName) => sum + (archive.find(sectionName)?.uncompressedSize ?? 0),
@@ -53,7 +53,7 @@ describe.skipIf(samples.length === 0)('실제 HWPX 샘플', () => {
       it('문단 조각의 바이트 구간이 원본을 정확히 가리킨다', async () => {
         const result = await loadHwpxBytes(bytes, name)
         // section XML을 한 번 더 직접 읽어 조각을 대조한다.
-        const { ZipArchive } = await import('../src/hwpx/zip')
+        const { ZipArchive } = await import('../frontend/src/hwpx/zip')
         const archive = ZipArchive.open(bytes)
         for (const section of result.model.sections) {
           const xml = await archive.read(section.name)
@@ -69,7 +69,7 @@ describe.skipIf(samples.length === 0)('실제 HWPX 샘플', () => {
 
       it('독립적인 방식으로 다시 세어도 문단 텍스트가 같다', async () => {
         const result = await loadHwpxBytes(bytes, name)
-        const { ZipArchive } = await import('../src/hwpx/zip')
+        const { ZipArchive } = await import('../frontend/src/hwpx/zip')
         const archive = ZipArchive.open(bytes)
         for (const section of result.model.sections) {
           const xml = await archive.read(section.name)
@@ -80,8 +80,8 @@ describe.skipIf(samples.length === 0)('실제 HWPX 샘플', () => {
       })
 
       it('실제 문서를 수정해도 이미지와 ZIP 구조가 그대로 남는다', async () => {
-        const { HwpxDocument } = await import('../src/hwpx/session')
-        const { ZipArchive } = await import('../src/hwpx/zip')
+        const { HwpxDocument } = await import('../frontend/src/hwpx/session')
+        const { ZipArchive } = await import('../frontend/src/hwpx/zip')
         const loaded = await loadHwpxBytes(bytes, name)
         const document = HwpxDocument.fromLoadResult(loaded)
 

@@ -6,11 +6,14 @@ dist/
 
 # 실제 사내 HWPX는 저장소에 커밋하지 않는다.
 # 로컬 검증용 파일은 여기에 두면 통합 테스트가 자동으로 찾아 쓴다.
-fixtures/local/
+samples/local/
 
 # 로컬 개발 편의 설정
 .claude/
-fixtures/output/
+samples/output/
 
 # wrangler 로컬 상태
 .wrangler/
+
+# macOS
+.DS_Store

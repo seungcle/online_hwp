@@ -1,5 +1,5 @@
 /**
- * `fixtures/local/`의 실제 HWPX에 수정을 적용해 결과 파일을 만든다.
+ * `samples/local/`의 실제 HWPX에 수정을 적용해 결과 파일을 만든다.
  * 한글에서 직접 열어 서식과 이미지가 살아 있는지 눈으로 확인하기 위한 것이다.
  *
  *   npm run sample:edit
@@ -10,12 +10,12 @@
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
-import { loadHwpxBytes } from '../src/hwpx/package'
-import { HwpxDocument } from '../src/hwpx/session'
-import type { EditOperation } from '../src/hwpx/patch'
+import { loadHwpxBytes } from '../frontend/src/hwpx/package'
+import { HwpxDocument } from '../frontend/src/hwpx/session'
+import type { EditOperation } from '../frontend/src/hwpx/patch'
 
-const inputDir = resolve(process.env['HWPX_FIXTURE_DIR'] ?? 'fixtures/local')
-const outputDir = resolve('fixtures/output')
+const inputDir = resolve(process.env['HWPX_SAMPLE_DIR'] ?? 'samples/local')
+const outputDir = resolve('samples/output')
 
 if (!existsSync(inputDir)) {
   console.error(`${inputDir} 가 없습니다. 실제 .hwpx를 넣어 주세요.`)

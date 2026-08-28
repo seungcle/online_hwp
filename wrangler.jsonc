@@ -3,7 +3,7 @@
   // Worker 이름은 rhwp.co.kr 도메인이 붙어 있는 기존 서비스 이름이므로 바꾸면 안 된다.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "online-hwp",
-  "main": "worker/index.ts",
+  "main": "backend/index.ts",
   "compatibility_date": "2026-06-19",
   "observability": { "enabled": true },
   "assets": {

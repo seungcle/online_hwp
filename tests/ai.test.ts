@@ -2,15 +2,15 @@
 
 import { describe, expect, it } from 'vitest'
 import { buildHwpx } from './helpers/hwpx-fixture'
-import { loadHwpxBytes } from '../src/hwpx/package'
-import { collectParagraphs } from '../src/ai/client'
+import { loadHwpxBytes } from '../frontend/src/hwpx/package'
+import { collectParagraphs } from '../frontend/src/ai/client'
 import {
   EDIT_PLAN_SCHEMA,
   MAX_INSTRUCTION_CHARS,
   SchemaError,
   parseEditPlanResponse,
   validateRequest,
-} from '../src/ai/schema'
+} from '../frontend/src/ai/schema'
 
 describe('parseEditPlanResponse', () => {
   it('정상 응답을 통과시킨다', () => {

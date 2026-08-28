@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildHwpx } from './helpers/hwpx-fixture'
-import { loadHwpxBytes } from '../src/hwpx/package'
-import { escapeHtml, renderDocument } from '../src/preview/render'
+import { loadHwpxBytes } from '../frontend/src/hwpx/package'
+import { escapeHtml, renderDocument } from '../frontend/src/preview/render'
 
 async function html(): Promise<string> {
   const result = await loadHwpxBytes(await buildHwpx(), 'sample.hwpx')

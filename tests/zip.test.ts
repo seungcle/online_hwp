@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildZip } from './helpers/zip-builder'
-import { COMPRESSION_DEFLATE, COMPRESSION_STORED, ZipArchive, ZipError } from '../src/hwpx/zip'
+import { COMPRESSION_DEFLATE, COMPRESSION_STORED, ZipArchive, ZipError } from '../frontend/src/hwpx/zip'
 
 describe('ZipArchive', () => {
   it('중앙 디렉터리 순서를 그대로 보존한다', async () => {

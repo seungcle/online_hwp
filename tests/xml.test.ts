@@ -7,7 +7,7 @@ import {
   parseAttributes,
   scanXml,
   slice,
-} from '../src/hwpx/xml'
+} from '../frontend/src/hwpx/xml'
 
 const encode = (value: string): Uint8Array => new TextEncoder().encode(value)
 

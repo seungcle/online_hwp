@@ -20,7 +20,7 @@ import {
   parseEditPlanResponse,
   validateRequest,
   type EditPlanRequest,
-} from '../src/ai/schema'
+} from '../frontend/src/ai/schema'
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> }

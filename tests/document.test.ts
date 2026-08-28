@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SECTION_XML, cell, para, run, table, text } from './helpers/hwpx-fixture'
-import { buildDocumentModel, parseSection, type Block, type Paragraph } from '../src/hwpx/document'
+import { buildDocumentModel, parseSection, type Block, type Paragraph } from '../frontend/src/hwpx/document'
 
 const encode = (value: string): Uint8Array => new TextEncoder().encode(value)
 
