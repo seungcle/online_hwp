@@ -47,6 +47,14 @@ npm run ai:check     # AI를 실제로 불러 왕복 확인. .dev.vars 에 OPENA
 
 master push → Cloudflare Workers Builds가 `npm run build` 후 `npx wrangler deploy`.
 
+배포가 끝났는지는 GitHub가 받아 두는 빌드 결과로 확인한다. 로컬에 Cloudflare
+토큰이 없어도 되고, Worker만 고쳐 프론트 번들 해시가 그대로일 때도 알 수 있다.
+
+```bash
+gh api repos/seungcle/online_hwp/commits/<sha>/check-runs \
+  --jq '.check_runs[] | "\(.name): \(.conclusion)"'
+```
+
 - Worker 이름 `online-hwp`은 `rhwp.co.kr`이 붙어 있다. **바꾸면 도메인이 끊긴다.**
 - 모델은 `gpt-5.6-terra`(균형 등급) + `reasoning_effort: low`. `OPENAI_MODEL`,
   `OPENAI_REASONING_EFFORT`로 바꿀 수 있다. 추론을 지원하지 않는 모델을 쓸 때는
