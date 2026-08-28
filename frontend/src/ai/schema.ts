@@ -120,6 +120,11 @@ export interface DocumentParagraph {
   readonly text: string
   /** `본문` 또는 `표` 같은 위치 힌트. */
   readonly where: string
+  /**
+   * 논리 경로. 예: `s0/b4/r1c0/b0`. 알려진 양식을 다시 알아볼 때 쓴다.
+   * 바이트 오프셋이 아니라 "몇 번째 블록, 몇 행 몇 열"이라 재저장에 견딘다.
+   */
+  readonly path: string
 }
 
 /**
@@ -139,6 +144,36 @@ export interface EditPlanRequest {
   readonly paragraphs: readonly DocumentParagraph[]
   /** 오래된 것부터. 없으면 첫 요청이다. */
   readonly history?: readonly ConversationTurn[]
+  /** 구조 지문. 있으면 알려진 양식인지 먼저 찾아본다. */
+  readonly structure?: {
+    readonly structureHash: string
+    readonly skeleton: string
+    readonly paragraphCount: number
+    readonly tableCount: number
+    readonly imageCount: number
+  }
+}
+
+/**
+ * 이번 요청이 어떻게 처리됐는지. 화면에 보여 주기 위한 것이 아니라
+ * 알려진 양식 경로가 실제로 도는지 확인하기 위한 것이다.
+ * 문서 원문은 담지 않는다.
+ */
+export interface EditPlanDebug {
+  readonly structureHash?: string
+  readonly templateLookup: 'hit' | 'miss' | 'stale' | 'skipped' | 'unavailable'
+  readonly templateId?: string
+  readonly templateVersion?: number
+  readonly templateName?: string
+  /** 라벨이 몇 할이나 살아 있었나. 판정 근거. */
+  readonly anchorRatio?: number
+  /** 알려진 양식 경로를 접고 재분석으로 넘어갔는가. */
+  readonly fallback?: string
+  /** 이번 요청에 실제로 부른 AI 호출. `structure`가 없으면 구조 분석을 건너뛴 것이다. */
+  readonly aiCalls: readonly ('structure' | 'plan' | 'plan-broadened')[]
+  readonly lookupMs?: number
+  readonly aiMs?: number
+  readonly totalMs?: number
 }
 
 export interface EditPlanOperation {
@@ -152,6 +187,7 @@ export interface EditPlanOperation {
 export interface EditPlanResponse {
   readonly summary: string
   readonly operations: readonly EditPlanOperation[]
+  readonly debug?: EditPlanDebug
 }
 
 /** AI가 다룰 수 있는 문서 크기 상한. 넘으면 요청 전에 막는다. */
@@ -205,7 +241,12 @@ export function parseEditPlanResponse(value: unknown): EditPlanResponse {
     }
   })
 
-  return { summary: record['summary'], operations }
+  const debug = record['debug']
+  return {
+    summary: record['summary'],
+    operations,
+    ...(debug && typeof debug === 'object' ? { debug: debug as EditPlanDebug } : {}),
+  }
 }
 
 export function validateRequest(request: EditPlanRequest): void {

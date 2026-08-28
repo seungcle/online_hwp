@@ -6,6 +6,16 @@
   "main": "backend/index.ts",
   "compatibility_date": "2026-06-19",
   "observability": { "enabled": true },
+  // 알려진 양식 저장소. 원본 HWPX·이미지·본문은 넣지 않는다. 스키마는 migrations/.
+  // 바인딩이 없어도 서비스는 돈다 — 매번 처음 보는 문서로 처리될 뿐이다.
+  "d1_databases": [
+    {
+      "binding": "TEMPLATES",
+      "database_name": "rhwp-templates",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

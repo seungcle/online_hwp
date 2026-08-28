@@ -462,3 +462,14 @@ body.debug .pv-p[data-split] { background: #fff8e1; }
 
 .doc-cta { margin-top: 36px; }
 .doc-cta .btn { display: inline-block; text-decoration: none; }
+
+/* 디버그 줄. ?debug=1 일 때만 붙는다. 알려진 양식 경로가 도는지 확인하는 용도다. */
+.ai-debug {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  word-break: break-all;
+}

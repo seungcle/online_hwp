@@ -6,7 +6,8 @@
  */
 
 import { AiError, collectParagraphs, requestEditPlan, resolveEditPlan } from './ai/client'
-import { MAX_HISTORY_TURNS, type ConversationTurn } from './ai/schema'
+import { MAX_HISTORY_TURNS, type ConversationTurn, type EditPlanDebug } from './ai/schema'
+import { computeStructure } from './hwpx/fingerprint'
 import { HwpxError } from './hwpx/package'
 import { PatchError } from './hwpx/patch'
 import { HwpxDocument } from './hwpx/session'
@@ -135,13 +136,22 @@ async function runEdit(): Promise<void> {
   const controller = new AbortController()
   inFlight = controller
   try {
-    const paragraphs = collectParagraphs(doc.model)
-    const response = await requestEditPlan(instruction, paragraphs, history, controller.signal)
+    // 구조 지문은 문단 목록과 같은 모델에서 한 번에 뽑는다.
+    const structure = computeStructure(doc.model)
+    const paragraphs = collectParagraphs(doc.model, structure)
+    const response = await requestEditPlan(
+      instruction,
+      paragraphs,
+      history,
+      structure,
+      controller.signal,
+    )
 
     remember('assistant', response.summary)
 
     if (response.operations.length === 0) {
       pending.replaceWith(note(response.summary || '바꿀 내용을 찾지 못했습니다.', 'ai-note'))
+      appendDebug(response.debug)
       return
     }
 
@@ -150,12 +160,14 @@ async function runEdit(): Promise<void> {
     if (plan.operations.length === 0) {
       // 계획은 왔지만 전부 원문과 같은 내용이었다.
       pending.replaceWith(note(response.summary || '바꿀 내용을 찾지 못했습니다.', 'ai-note'))
+      appendDebug(response.debug)
       return
     }
     const applied = doc.apply(plan)
     paintPreview()
     downloadButton.disabled = false
     pending.replaceWith(renderChanges(response.summary, applied))
+    appendDebug(response.debug)
     highlight(applied.map((change) => change.paragraphId))
   } catch (error) {
     pending.replaceWith(renderFailure(error))
@@ -186,6 +198,41 @@ function renderChanges(
     `<p class="ai-count">${changes.length}곳을 수정했습니다.</p>` +
     `<ul class="diff">${items}</ul>`
   return box
+}
+
+/**
+ * 알려진 양식 경로가 실제로 도는지 눈으로 확인하는 자리.
+ *
+ * 사용자용 기능이 아니다. `?debug=1` 로 열었을 때만 나온다. 양식 관리 화면을
+ * 먼저 만들 이유는 없지만, hit 인지 miss 인지 보이지 않으면 이 기능이 도는지
+ * 알 방법이 없다.
+ */
+const debugEnabled =
+  new URLSearchParams(location.search).has('debug') ||
+  localStorage.getItem('rhwp:debug') === '1'
+
+function appendDebug(debug: EditPlanDebug | undefined): void {
+  if (!debugEnabled || !debug) return
+  const lookup = debug.templateLookup
+  const label =
+    lookup === 'hit'
+      ? `양식 hit — ${debug.templateName ?? '이름 없음'} v${debug.templateVersion} (라벨 ${Math.round((debug.anchorRatio ?? 0) * 100)}%)`
+      : lookup === 'stale'
+        ? `양식 stale — 재분석 (라벨 ${Math.round((debug.anchorRatio ?? 0) * 100)}%)`
+        : lookup === 'miss'
+          ? `양식 miss — 새로 분석${debug.templateVersion ? ` → v${debug.templateVersion}` : ''}`
+          : `양식 조회 ${lookup}`
+  const parts = [
+    label,
+    `AI 호출 ${debug.aiCalls.length}회 (${debug.aiCalls.join(', ') || '없음'})`,
+    debug.structureHash ? `지문 ${debug.structureHash}` : '',
+    debug.lookupMs !== undefined ? `조회 ${debug.lookupMs}ms` : '',
+    debug.aiMs !== undefined ? `AI ${debug.aiMs}ms` : '',
+    debug.totalMs !== undefined ? `합계 ${debug.totalMs}ms` : '',
+    debug.fallback ?? '',
+  ].filter(Boolean)
+  aiLog.append(note(parts.join(' · '), 'ai-msg ai-debug'))
+  scrollLog()
 }
 
 function renderFailure(error: unknown): HTMLElement {

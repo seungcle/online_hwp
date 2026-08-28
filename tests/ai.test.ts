@@ -83,7 +83,7 @@ describe('parseEditPlanResponse', () => {
 })
 
 describe('validateRequest', () => {
-  const paragraphs = [{ id: 's0-p0', text: '안녕하세요', where: '본문' }]
+  const paragraphs = [{ id: 's0-p0', text: '안녕하세요', where: '본문', path: 's0/b0' }]
 
   it('정상 요청을 통과시킨다', () => {
     expect(() => validateRequest({ instruction: '바꿔줘', paragraphs })).not.toThrow()
@@ -106,7 +106,7 @@ describe('validateRequest', () => {
   })
 
   it('문서가 너무 길면 거부한다', () => {
-    const huge = [{ id: 's0-p0', text: '가'.repeat(200_000), where: '본문' }]
+    const huge = [{ id: 's0-p0', text: '가'.repeat(200_000), where: '본문', path: 's0/b0' }]
     expect(() => validateRequest({ instruction: '바꿔줘', paragraphs: huge })).toThrow(
       /문서가 너무 깁니다/,
     )
@@ -117,6 +117,7 @@ describe('validateRequest', () => {
       id: `s0-p${i}`,
       text: '짧음',
       where: '본문',
+      path: `s0/b${i}`,
     }))
     expect(() => validateRequest({ instruction: '바꿔줘', paragraphs: many })).toThrow(
       /문단이 너무 많습니다/,
@@ -135,10 +136,13 @@ describe('collectParagraphs', () => {
     expect(paragraphs.map((p) => p.id)).toContain('s0-p0')
   })
 
-  it('AI에 파일이나 XML을 보내지 않는다 — id/텍스트/위치뿐', async () => {
+  it('AI에 파일이나 XML을 보내지 않는다 — id/텍스트/위치/논리경로뿐', async () => {
     const result = await loadHwpxBytes(await buildHwpx(), 'sample.hwpx')
     const [first] = collectParagraphs(result.model)
-    expect(Object.keys(first!).sort()).toEqual(['id', 'text', 'where'])
+    // path 는 "몇 번째 블록, 몇 행 몇 열"이라 내용을 담지 않는다.
+    // 바이트 오프셋이나 XML 조각이 새어 나가면 여기서 걸린다.
+    expect(Object.keys(first!).sort()).toEqual(['id', 'path', 'text', 'where'])
+    expect(first!.path).toMatch(/^s\d+(\/(b\d+|r\d+c\d+))+$/)
   })
 })
 
@@ -171,8 +175,8 @@ describe('paragraphChecksum', () => {
 
 describe('resolveEditPlan', () => {
   const paragraphs = [
-    { id: 's0-p0', text: '   - 들여쓰기가 있는 문단', where: '본문' },
-    { id: 's0-p1', text: '평범한 문단', where: '본문' },
+    { id: 's0-p0', text: '   - 들여쓰기가 있는 문단', where: '본문', path: 's0/b0' },
+    { id: 's0-p1', text: '평범한 문단', where: '본문', path: 's0/b0' },
   ]
   const ok = (id: string, newText: string) => ({
     paragraphId: id,
@@ -233,9 +237,9 @@ describe('resolveEditPlan', () => {
 
 describe('resolveEditPlan — 원문 앞뒤 공백', () => {
   const paragraphs = [
-    { id: 's0-p0', text: '   - 들여쓰기가 있는 문단', where: '본문' },
-    { id: 's0-p1', text: '붙임1  ', where: '본문' },
-    { id: 's0-p2', text: '평범한 문단', where: '본문' },
+    { id: 's0-p0', text: '   - 들여쓰기가 있는 문단', where: '본문', path: 's0/b0' },
+    { id: 's0-p1', text: '붙임1  ', where: '본문', path: 's0/b0' },
+    { id: 's0-p2', text: '평범한 문단', where: '본문', path: 's0/b0' },
   ]
   const op = (id: string, newText: string) => ({
     paragraphId: id,
@@ -268,9 +272,9 @@ describe('resolveEditPlan — 원문 앞뒤 공백', () => {
 
 describe('resolveEditPlan — 내용이 같은 수정', () => {
   const paragraphs = [
-    { id: 's0-p0', text: '대상은 중학생입니다.', where: '본문' },
-    { id: 's0-p1', text: '   들여쓰기 문단', where: '본문' },
-    { id: 's0-p2', text: '바꿀 문단', where: '본문' },
+    { id: 's0-p0', text: '대상은 중학생입니다.', where: '본문', path: 's0/b0' },
+    { id: 's0-p1', text: '   들여쓰기 문단', where: '본문', path: 's0/b0' },
+    { id: 's0-p2', text: '바꿀 문단', where: '본문', path: 's0/b0' },
   ]
   const op = (id: string, newText: string) => ({
     paragraphId: id,
@@ -303,7 +307,7 @@ describe('resolveEditPlan — 내용이 같은 수정', () => {
 describe('validateRequest — 대화 기록', () => {
   const base = {
     instruction: '그걸로 해줘',
-    paragraphs: [{ id: 's0-p0', text: '2025년 사업 제안서', where: '본문' }],
+    paragraphs: [{ id: 's0-p0', text: '2025년 사업 제안서', where: '본문', path: 's0/b0' }],
   }
 
   it('되물음을 이어받는 기록을 받아들인다', () => {

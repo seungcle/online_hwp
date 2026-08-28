@@ -6,6 +6,7 @@
  */
 
 import type { Block, DocumentModel } from '../hwpx/document'
+import { computeStructure, type DocumentStructure } from '../hwpx/fingerprint'
 import { PatchError, type EditPlan, type PatchIssue } from '../hwpx/patch'
 import {
   SchemaError,
@@ -27,27 +28,45 @@ export class AiError extends Error {
   }
 }
 
-/** AI에 보낼 문단 목록. 빈 문단은 바꿀 수 없으므로 제외한다. */
-export function collectParagraphs(model: DocumentModel): DocumentParagraph[] {
+/**
+ * AI에 보낼 문단 목록. 빈 문단은 바꿀 수 없으므로 제외한다.
+ *
+ * 문단마다 논리 경로를 함께 싣는다. 알려진 양식을 다시 알아볼 때 id만으로는
+ * 부족하기 때문이다 — 문단이 하나 늘면 뒤쪽 id가 통째로 밀린다.
+ */
+export function collectParagraphs(
+  model: DocumentModel,
+  structure: DocumentStructure = computeStructure(model),
+): DocumentParagraph[] {
   const out: DocumentParagraph[] = []
   for (const section of model.sections) {
-    walk(section.blocks, '본문', out)
+    walk(section.blocks, '본문', out, structure)
   }
   return out
 }
 
-function walk(blocks: readonly Block[], where: string, out: DocumentParagraph[]): void {
+function walk(
+  blocks: readonly Block[],
+  where: string,
+  out: DocumentParagraph[],
+  structure: DocumentStructure,
+): void {
   for (const block of blocks) {
     if (block.kind === 'paragraph') {
       if (block.text.trim().length > 0) {
-        out.push({ id: block.id, text: block.text, where })
+        out.push({
+          id: block.id,
+          text: block.text,
+          where,
+          path: structure.paths.get(block.id) ?? '',
+        })
       }
       continue
     }
     if (block.kind === 'table') {
       block.rows.forEach((row, rowIndex) => {
         row.forEach((cell, columnIndex) => {
-          walk(cell.blocks, `표 ${rowIndex + 1}행 ${columnIndex + 1}열`, out)
+          walk(cell.blocks, `표 ${rowIndex + 1}행 ${columnIndex + 1}열`, out, structure)
         })
       })
     }
@@ -58,9 +77,26 @@ export async function requestEditPlan(
   instruction: string,
   paragraphs: readonly DocumentParagraph[],
   history: readonly ConversationTurn[] = [],
+  structure?: DocumentStructure,
   signal?: AbortSignal,
 ): Promise<EditPlanResponse> {
-  const payload = { instruction, paragraphs, ...(history.length ? { history } : {}) }
+  const payload = {
+    instruction,
+    paragraphs,
+    ...(history.length ? { history } : {}),
+    // 뼈대만 보낸다. 경로별 텍스트는 위 문단 목록에 이미 들어 있다.
+    ...(structure
+      ? {
+          structure: {
+            structureHash: structure.structureHash,
+            skeleton: structure.skeleton,
+            paragraphCount: structure.paragraphCount,
+            tableCount: structure.tableCount,
+            imageCount: structure.imageCount,
+          },
+        }
+      : {}),
+  }
   try {
     validateRequest(payload)
   } catch (error) {

@@ -6,7 +6,8 @@ HWPX 양식을 유지한 채 텍스트만 AI로 수정하는 웹 서비스. http
 
 ```
 frontend/   브라우저 코드 전부. Vite root. (src/hwpx, src/ai, src/preview)
-backend/    Cloudflare Worker 하나. OpenAI 프록시 + 소유확인 파일 라우팅.
+backend/    Cloudflare Worker 하나. OpenAI 프록시 + 알려진 양식 조회 + 소유확인 라우팅.
+migrations/ D1 스키마. 알려진 양식만 저장한다. 문서 내용은 넣지 않는다.
 docs/       에이전트용 참고 문서. 코드만 봐서는 안 나오는 배경.
 samples/    실제 HWPX와 결과물. local/ output/ 은 gitignore.
 tests/      vitest. 프론트·백 양쪽을 함께 본다.
@@ -22,7 +23,9 @@ npm run dev:worker   # Worker. dev와 함께 띄우면 /api 연결
 npm test
 npm run build        # tsc --noEmit && vite build → dist/
 npm run sample:edit  # samples/local/*.hwpx 를 수정해 samples/output/ 에 생성 (AI 없이)
+npm run db:local     # 로컬 D1 에 마이그레이션 적용
 npm run ai:check     # AI를 실제로 불러 왕복 확인. .dev.vars 에 OPENAI_API_KEY 필요
+npm run template:check  # 같은 문서를 두 번 올려 miss → hit 를 확인
 ```
 
 ## 깨뜨리면 안 되는 것
@@ -42,6 +45,11 @@ npm run ai:check     # AI를 실제로 불러 왕복 확인. .dev.vars 에 OPENA
 5. **AI에게 XML이나 파일을 주지 마라.** 문단 id·텍스트·위치 힌트만 보낸다.
    응답은 Structured Outputs로 강제하고, 받은 뒤 브라우저에서 다시 검증한다.
 6. **사내 HWPX를 커밋하지 마라.** `samples/local/`에 두면 테스트가 알아서 찾는다.
+7. **D1에 문서 내용을 넣지 마라.** 남기는 것은 구조 해시·뼈대·필드 위치와 이름·
+   라벨 문구·값의 해시뿐이다. 원본 HWPX, 이미지, 본문, 필드에 적힌 값은 넣지 않는다.
+   경계는 [ADR 0002](docs/adr/0002-known-template-store.md)와 `tests/template.test.ts`가 지킨다.
+8. **알려진 양식이어도 `oldText` 검증을 건너뛰지 마라.** 양식 기억은 AI 호출을
+   줄이는 장치다. 라벨이 어긋나면 자동으로 고치지 말고 재분석해 새 version으로 남긴다.
 
 ## 배포
 
@@ -63,6 +71,8 @@ gh api repos/seungcle/online_hwp/commits/<sha>/check-runs \
   로컬에서는 `.dev.vars`(gitignore)에 두면 `wrangler dev`가 읽는다. `.dev.vars.example` 참고.
   없으면 `/api/edit-plan`이 503을 주고 나머지 기능은 정상 동작한다.
 - `ads.txt`, 네이버 소유확인, `robots.txt`, `sitemap.xml`은 도메인 자산이다. 지우지 마라.
+- D1 `TEMPLATES` 바인딩이 없어도 서비스는 그대로 돈다. 매번 처음 보는 문서로
+  처리될 뿐이다. 바인딩이 빠졌다고 편집이 막히면 안 된다.
 
 ## 안 하는 것
 

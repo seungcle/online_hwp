@@ -12,6 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "sample:edit": "esbuild samples/make-output.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/sample-output.mjs --log-level=warning && node node_modules/.cache/sample-output.mjs",
+    "db:local": "wrangler d1 migrations apply rhwp-templates --local",
+    "db:remote": "wrangler d1 migrations apply rhwp-templates --remote",
+    "template:check": "esbuild samples/check-template.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/check-template.mjs --log-level=warning && node node_modules/.cache/check-template.mjs",
     "ai:check": "esbuild samples/check-ai.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/check-ai.mjs --log-level=warning && node node_modules/.cache/check-ai.mjs"
   },
   "devDependencies": {

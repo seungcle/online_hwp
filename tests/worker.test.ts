@@ -39,7 +39,7 @@ function env(overrides: Partial<FakeEnv> = {}): FakeEnv {
 
 const validBody = {
   instruction: '기간을 3개월로 바꿔줘',
-  paragraphs: [{ id: 's0-p0', text: '사업 기간은 1년 입니다.', where: '본문' }],
+  paragraphs: [{ id: 's0-p0', text: '사업 기간은 1년 입니다.', where: '본문', path: 's0/b0' }],
 }
 
 function post(body: unknown): Request {
@@ -96,7 +96,12 @@ describe('/api/edit-plan', () => {
     globalThis.fetch = vi.fn(async () => openAiReply(plan)) as never
     const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual(plan)
+    const body = await response.json()
+    const { debug, ...rest } = body
+    expect(rest).toEqual(plan)
+    // 처리 경로를 알려 주는 debug 가 함께 온다. 문서 원문은 담기지 않는다.
+    expect(debug.aiCalls).toEqual(['plan'])
+    expect(JSON.stringify(debug)).not.toContain('사업 기간')
   })
 
   it('추론 등급을 함께 보내고, 빈 값이면 아예 빼고 보낸다', async () => {

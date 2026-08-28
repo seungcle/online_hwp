@@ -23,8 +23,24 @@ import {
   paragraphChecksum,
   parseEditPlanResponse,
   validateRequest,
+  type EditPlanDebug,
   type EditPlanRequest,
 } from '../frontend/src/ai/schema'
+import {
+  TEMPLATE_ANALYSIS_SCHEMA,
+  TEMPLATE_SYSTEM_PROMPT,
+  TemplateError,
+  toTemplateDefinition,
+  type StoredTemplate,
+} from '../frontend/src/ai/template'
+import {
+  D1TemplateStore,
+  matchTemplate,
+  nextVersion,
+  type D1Database,
+  type IncomingStructure,
+  type TemplateStore,
+} from './templates'
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> }
@@ -33,6 +49,11 @@ interface Env {
   OPENAI_REASONING_EFFORT?: string
   /** 제한 시간(ms). 테스트에서 짧게 두려고 열어 둔다. */
   OPENAI_TIMEOUT_MS?: string
+  /**
+   * 알려진 양식 저장소. 없어도 서비스는 그대로 돈다 — 매번 처음 보는 문서처럼
+   * 처리할 뿐이다. 바인딩이 빠졌다고 편집이 막히면 안 된다.
+   */
+  TEMPLATES?: D1Database
 }
 
 /**
@@ -122,10 +143,24 @@ async function handleEditPlan(request: Request, env: Env): Promise<Response> {
   const controller = new AbortController()
   const limit = Number(env.OPENAI_TIMEOUT_MS ?? '') || TIMEOUT_MS
   const timer = setTimeout(() => controller.abort(), limit)
+  const startedAt = Date.now()
+  const aiCalls: EditPlanDebug['aiCalls'][number][] = []
   try {
-    const plan = parseEditPlanResponse(await callModel(payload, env, controller.signal))
+    const lookup = await resolveTemplate(payload, env, controller.signal, aiCalls)
+    const aiStartedAt = Date.now()
+    const plan = parseEditPlanResponse(
+      await callModel(payload, env, controller.signal, lookup.template),
+    )
+    aiCalls.push('plan')
+
+    const debug: EditPlanDebug = {
+      ...lookup.debug,
+      aiCalls,
+      aiMs: Date.now() - aiStartedAt,
+      totalMs: Date.now() - startedAt,
+    }
     // Worker에서 한 번 검증하고, 브라우저에서 또 검증한다.
-    return Response.json(plan, {
+    return Response.json({ ...plan, debug }, {
       headers: { 'cache-control': 'no-store' },
     })
   } catch (error) {
@@ -155,6 +190,147 @@ async function handleEditPlan(request: Request, env: Env): Promise<Response> {
 }
 
 /**
+ * 이 문서가 아는 양식인지 찾아본다. 처음 보는 것이면 AI에게 한 번 뜯어보게 하고
+ * 그 결과를 저장한다.
+ *
+ * 여기서 **AI 호출 한 번이 갈린다.** 아는 양식이면 구조 분석을 건너뛰고 바로
+ * 수정 계획만 세운다. 처음 보는 양식이면 구조 분석 한 번이 더 든다.
+ *
+ * 어느 단계가 실패해도 편집 자체는 막지 않는다. D1 바인딩이 없거나, 조회가
+ * 실패하거나, 분석이 형식을 어겨도 그냥 "모르는 문서"로 처리하고 넘어간다.
+ * 양식 기억은 빠르게 하려고 붙인 장치이지 편집의 전제가 아니다.
+ */
+async function resolveTemplate(
+  payload: EditPlanRequest,
+  env: Env,
+  signal: AbortSignal,
+  aiCalls: EditPlanDebug['aiCalls'][number][],
+): Promise<{ template?: StoredTemplate; debug: Omit<EditPlanDebug, 'aiCalls'> }> {
+  if (!payload.structure) return { debug: { templateLookup: 'skipped' } }
+  if (!env.TEMPLATES) {
+    return {
+      debug: { structureHash: payload.structure.structureHash, templateLookup: 'unavailable' },
+    }
+  }
+
+  const store: TemplateStore = new D1TemplateStore(env.TEMPLATES)
+  const incoming: IncomingStructure = {
+    structureHash: payload.structure.structureHash,
+    skeleton: payload.structure.skeleton,
+    paragraphs: payload.paragraphs.map((p) => ({ id: p.id, text: p.text, path: p.path })),
+  }
+
+  const lookupStartedAt = Date.now()
+  let candidates: StoredTemplate[]
+  try {
+    candidates = await store.findByStructure(incoming.structureHash)
+  } catch (error) {
+    console.error('template lookup failed', String((error as Error)?.message).slice(0, 200))
+    return {
+      debug: { structureHash: incoming.structureHash, templateLookup: 'unavailable' },
+    }
+  }
+  const outcome = matchTemplate(candidates, incoming)
+  const lookupMs = Date.now() - lookupStartedAt
+
+  if (outcome.kind === 'hit') {
+    // 구조 분석을 건너뛴다. aiCalls 에 'structure' 가 없다는 것이 그 증거다.
+    return {
+      template: outcome.template,
+      debug: {
+        structureHash: incoming.structureHash,
+        templateLookup: 'hit',
+        templateId: outcome.template.id,
+        templateVersion: outcome.template.version,
+        templateName: outcome.template.name,
+        anchorRatio: outcome.anchorRatio,
+        lookupMs,
+      },
+    }
+  }
+
+  // miss 이거나, 라벨이 어긋나 믿을 수 없는 경우다. 자동으로 고치지 않고 다시 분석한다.
+  const fallback =
+    outcome.kind === 'stale'
+      ? `라벨 ${Math.round(outcome.anchorRatio * 100)}%만 일치해 재분석했습니다.`
+      : undefined
+
+  let stored: StoredTemplate | undefined
+  try {
+    const definition = toTemplateDefinition(
+      await analyzeTemplate(payload, env, signal),
+      incoming.paragraphs,
+    )
+    aiCalls.push('structure')
+    stored = await store.save(
+      incoming.structureHash,
+      incoming.skeleton,
+      {
+        paragraphs: payload.structure.paragraphCount,
+        tables: payload.structure.tableCount,
+        images: payload.structure.imageCount,
+      },
+      definition,
+      nextVersion(candidates),
+    )
+  } catch (error) {
+    if (signal.aborted) throw error
+    // 분석이나 저장이 실패해도 편집은 계속한다. 다음 요청에서 다시 시도하면 된다.
+    console.error(
+      'template analysis failed',
+      error instanceof TemplateError ? error.message : String((error as Error)?.message).slice(0, 200),
+    )
+  }
+
+  return {
+    template: stored,
+    debug: {
+      structureHash: incoming.structureHash,
+      templateLookup: outcome.kind === 'stale' ? 'stale' : 'miss',
+      ...(stored
+        ? { templateId: stored.id, templateVersion: stored.version, templateName: stored.name }
+        : {}),
+      ...(outcome.kind === 'stale' ? { anchorRatio: outcome.anchorRatio } : {}),
+      ...(fallback ? { fallback } : {}),
+      lookupMs,
+    },
+  }
+}
+
+/** 양식을 한 번 뜯어본다. 문서마다 한 번이면 된다. */
+async function analyzeTemplate(
+  payload: EditPlanRequest,
+  env: Env,
+  signal: AbortSignal,
+): Promise<unknown> {
+  const model = newChatModel(env).withStructuredOutput(TEMPLATE_ANALYSIS_SCHEMA, {
+    name: 'template_analysis',
+    strict: true,
+  })
+  const lines = payload.paragraphs.map(
+    (paragraph) => `[${paragraph.id}] (${paragraph.where}) ${JSON.stringify(paragraph.text)}`,
+  )
+  return model.invoke(
+    [
+      new SystemMessage(TEMPLATE_SYSTEM_PROMPT),
+      new HumanMessage(['## 문단 목록', ...lines].join('\n')),
+    ],
+    { signal },
+  )
+}
+
+function newChatModel(env: Env): ChatOpenAI {
+  const effort = env.OPENAI_REASONING_EFFORT ?? DEFAULT_REASONING_EFFORT
+  return new ChatOpenAI({
+    apiKey: env.OPENAI_API_KEY,
+    model: env.OPENAI_MODEL ?? DEFAULT_MODEL,
+    ...(effort ? { reasoning: { effort: effort as never } } : {}),
+    // 실패는 우리 오류 화면으로 그대로 올린다. 조용히 다시 부르면 45초가 90초가 된다.
+    maxRetries: 0,
+  })
+}
+
+/**
  * 모델 호출. LangChain의 ChatOpenAI를 쓴다.
  *
  * 대화는 `BaseMessage` 배열로 조립한다. 시스템 지시 → 지난 대화 → 이번 요청
@@ -170,15 +346,9 @@ async function callModel(
   payload: EditPlanRequest,
   env: Env,
   signal: AbortSignal,
+  template?: StoredTemplate,
 ): Promise<unknown> {
-  const effort = env.OPENAI_REASONING_EFFORT ?? DEFAULT_REASONING_EFFORT
-  const model = new ChatOpenAI({
-    apiKey: env.OPENAI_API_KEY,
-    model: env.OPENAI_MODEL ?? DEFAULT_MODEL,
-    ...(effort ? { reasoning: { effort: effort as never } } : {}),
-    // 실패는 우리 오류 화면으로 그대로 올린다. 조용히 다시 부르면 45초가 90초가 된다.
-    maxRetries: 0,
-  }).withStructuredOutput(EDIT_PLAN_SCHEMA, {
+  const model = newChatModel(env).withStructuredOutput(EDIT_PLAN_SCHEMA, {
     name: 'edit_plan',
     strict: true,
     // 원본 메시지도 함께 받는다. 모델이 거절했을 때 그 이유를 그대로 보여 주려면
@@ -192,7 +362,7 @@ async function callModel(
       turn.role === 'assistant' ? new AIMessage(turn.content) : new HumanMessage(turn.content),
     )
   }
-  messages.push(new HumanMessage(renderUserMessage(payload)))
+  messages.push(new HumanMessage(renderUserMessage(payload, template)))
 
   const { raw, parsed } = (await model.invoke(messages, { signal })) as {
     raw: { additional_kwargs?: { refusal?: string | null } }
@@ -245,16 +415,29 @@ function mapUpstreamError(error: unknown): Response | undefined {
  * 검증코드는 여기서 계산해 붙인다. 브라우저가 응답을 확인할 때 같은 함수를
  * 쓰므로, 프롬프트에 실린 값과 검증에 쓰는 값이 어긋날 수 없다.
  */
-function renderUserMessage(payload: EditPlanRequest): string {
+function renderUserMessage(payload: EditPlanRequest, template?: StoredTemplate): string {
   const lines = payload.paragraphs.map(
     (paragraph) =>
       `[${paragraph.id} ${paragraphChecksum(paragraph.text)}] (${paragraph.where}) ` +
       JSON.stringify(paragraph.text),
   )
+  // 아는 양식이면 어느 문단이 무슨 자리인지 이미 안다. 모델이 그걸 다시 추론하지
+  // 않도록 앞에 붙여 준다. 문단 목록 자체는 그대로 싣는다 — "문장 다듬어줘" 같은
+  // 요청은 필드 밖 문단도 건드려야 하고, 그 능력을 잃으면 안 된다.
+  const known = template
+    ? [
+        `## 아는 양식: ${template.name} (v${template.version})`,
+        '이 문서의 각 자리는 이미 분석돼 있다. 구조를 다시 추론하지 말고 그대로 쓴다.',
+        ...template.fields.map((field) => `- ${field.label} → ${field.paragraphId}`),
+        '',
+      ]
+    : []
+
   return [
     '## 사용자 요청',
     payload.instruction.trim(),
     '',
+    ...known,
     '## 문서 문단 목록',
     '형식: [문단id 검증코드] (위치) "현재 텍스트"',
     '텍스트는 JSON 문자열이다. 따옴표 안의 공백까지 모두 실제 글자다.',
