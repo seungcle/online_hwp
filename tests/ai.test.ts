@@ -264,3 +264,37 @@ describe('resolveEditPlan — 원문 앞뒤 공백', () => {
     expect(resolve('s0-p0', '')).toBe('')
   })
 })
+
+describe('resolveEditPlan — 내용이 같은 수정', () => {
+  const paragraphs = [
+    { id: 's0-p0', text: '대상은 중학생입니다.', where: '본문' },
+    { id: 's0-p1', text: '   들여쓰기 문단', where: '본문' },
+    { id: 's0-p2', text: '바꿀 문단', where: '본문' },
+  ]
+  const op = (id: string, newText: string) => ({
+    paragraphId: id,
+    checksum: paragraphChecksum(paragraphs.find((p) => p.id === id)!.text),
+    newText,
+    reason: '요청',
+  })
+
+  it('글자가 같으면 계획에서 뺀다', () => {
+    // 적용하면 문단 조각이 하나로 합쳐져 형광펜 같은 서식이 사라진다.
+    const plan = resolveEditPlan(
+      { summary: 's', operations: [op('s0-p0', '대상은 중학생입니다.'), op('s0-p2', '바뀐 문단')] },
+      paragraphs,
+    )
+    expect(plan.operations.map((o) => o.paragraphId)).toEqual(['s0-p2'])
+  })
+
+  it('앞뒤 공백을 되돌린 뒤 같아지는 경우도 뺀다', () => {
+    const plan = resolveEditPlan({ summary: 's', operations: [op('s0-p1', '들여쓰기 문단')] }, paragraphs)
+    expect(plan.operations).toHaveLength(0)
+  })
+
+  it('전부 같으면 빈 계획이 된다 — 오류가 아니다', () => {
+    const plan = resolveEditPlan({ summary: 's', operations: [op('s0-p0', '대상은 중학생입니다.')] }, paragraphs)
+    expect(plan.operations).toHaveLength(0)
+    expect(plan.summary).toBe('s')
+  })
+})

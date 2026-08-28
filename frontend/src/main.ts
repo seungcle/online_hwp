@@ -130,6 +130,11 @@ async function runEdit(): Promise<void> {
 
     // 원문(oldText)은 AI 응답이 아니라 방금 보낸 문단 목록에서 채운다.
     const plan = resolveEditPlan(response, paragraphs)
+    if (plan.operations.length === 0) {
+      // 계획은 왔지만 전부 원문과 같은 내용이었다.
+      pending.replaceWith(note(response.summary || '바꿀 내용을 찾지 못했습니다.', 'ai-note'))
+      return
+    }
     const applied = doc.apply(plan)
     paintPreview()
     downloadButton.disabled = false

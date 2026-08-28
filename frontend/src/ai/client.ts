@@ -151,11 +151,17 @@ export function resolveEditPlan(
       continue
     }
 
+    const newText = keepOuterSpacing(text, operation.newText)
+    // 모델은 고칠 것이 없는 문단도 계획에 넣곤 한다. 글자가 같다면 손대지 않는다.
+    // 내용이 같아도 적용하면 문단의 텍스트 조각이 하나로 합쳐지는데, 형광펜처럼
+    // 조각 사이에 끼어 있던 서식이 그때 사라진다. 안 바꾸는 것이 맞다.
+    if (newText === text) continue
+
     operations.push({
       type: 'replace_text',
       paragraphId: operation.paragraphId,
       oldText: text,
-      newText: keepOuterSpacing(text, operation.newText),
+      newText,
       ...(operation.reason ? { reason: operation.reason } : {}),
     })
   }
