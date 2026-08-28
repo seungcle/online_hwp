@@ -6,8 +6,10 @@
  */
 
 import type { Block, DocumentModel } from '../hwpx/document'
+import { PatchError, type EditPlan, type PatchIssue } from '../hwpx/patch'
 import {
   SchemaError,
+  paragraphChecksum,
   parseEditPlanResponse,
   validateRequest,
   type DocumentParagraph,
@@ -95,6 +97,76 @@ export async function requestEditPlan(
       'invalid_plan',
     )
   }
+}
+
+/**
+ * AI 응답을 patch engine이 받을 수 있는 Edit Plan으로 바꾼다.
+ *
+ * 여기가 이 파일에서 제일 중요한 부분이다. `oldText`는 **AI가 준 값을 쓰지 않고**
+ * 방금 AI에게 보낸 `paragraphs`에서 그대로 꺼낸다. 그래서 patch engine의
+ * 바이트 단위 대조는 "우리가 보여 준 문단이 지금도 그대로인가"를 확인하게 된다.
+ * 그게 원래 그 검증이 막으려던 것이다. 모델이 공백을 옮겨 적는 솜씨는 상관이 없다.
+ *
+ * 대신 "AI가 다른 문단을 보고 이 id를 적은 것은 아닌가"는 검증코드로 확인한다.
+ * 프롬프트 줄에 실린 코드와 그 id의 실제 텍스트에서 계산한 코드가 한 글자라도
+ * 다르면 계획 전체를 버린다. 부분 적용은 없다.
+ */
+export function resolveEditPlan(
+  response: EditPlanResponse,
+  paragraphs: readonly DocumentParagraph[],
+): EditPlan {
+  const sent = new Map(paragraphs.map((paragraph) => [paragraph.id, paragraph.text]))
+  const issues: PatchIssue[] = []
+  const seen = new Set<string>()
+  const operations: EditPlan['operations'][number][] = []
+
+  for (const operation of response.operations) {
+    const text = sent.get(operation.paragraphId)
+    if (text === undefined) {
+      issues.push({
+        paragraphId: operation.paragraphId,
+        kind: 'unknown-target',
+        message: `문서에 없는 문단입니다: ${operation.paragraphId}`,
+      })
+      continue
+    }
+    if (seen.has(operation.paragraphId)) {
+      issues.push({
+        paragraphId: operation.paragraphId,
+        kind: 'duplicate-target',
+        message: `같은 문단을 두 번 수정하려고 합니다: ${operation.paragraphId}`,
+        actualText: text,
+      })
+      continue
+    }
+    seen.add(operation.paragraphId)
+
+    if (paragraphChecksum(text) !== operation.checksum) {
+      issues.push({
+        paragraphId: operation.paragraphId,
+        kind: 'checksum-mismatch',
+        message: 'AI가 짚은 문단과 실제로 보고 있던 내용이 어긋납니다.',
+        actualText: text,
+      })
+      continue
+    }
+
+    operations.push({
+      type: 'replace_text',
+      paragraphId: operation.paragraphId,
+      oldText: text,
+      newText: operation.newText,
+      ...(operation.reason ? { reason: operation.reason } : {}),
+    })
+  }
+
+  if (issues.length > 0) {
+    throw new PatchError(
+      `수정 계획 ${issues.length}건이 어느 문단을 가리키는지 확인되지 않아 적용하지 않았습니다.`,
+      issues,
+    )
+  }
+  return { operations, summary: response.summary }
 }
 
 async function readError(response: Response): Promise<{ code: string; message: string }> {

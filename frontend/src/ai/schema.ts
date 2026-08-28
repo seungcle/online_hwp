@@ -6,6 +6,17 @@
  * 그렇게 받은 값도 **브라우저에서 한 번 더 검증**한다. 그리고 patch engine이
  * `oldText`가 실제 문서와 일치하는지 최종 확인한다. 검증이 세 겹인 이유는
  * 이 중 어느 하나라도 통과하면 문서가 망가질 수 있기 때문이다.
+ *
+ * **AI에게 원문을 그대로 받아 적게 하지 않는다.** 예전에는 `oldText`(문단 전체
+ * 텍스트)를 모델이 다시 써서 보내게 하고 그 값을 문서와 대조했다. 그런데 실제
+ * 문서 문단의 27%가 들여쓰기 공백이나 연속 공백을 가지고 있어서, 모델이
+ * `"   - 임상적…"`을 `" - 임상적…"`으로 줄여 쓰는 일이 계속 생겼다. 문서는
+ * 멀쩡한데 검증만 실패했다.
+ *
+ * 그래서 대조에 쓰는 원문은 **브라우저가 자기가 보낸 값을 그대로 들고 있다가**
+ * 쓴다. 모델은 그 대신 문단 줄에 적힌 짧은 검증코드(`checksum`)를 옮겨 적는다.
+ * id와 내용의 결합은 그대로 바이트 단위로 확인되면서, 모델이 실패할 여지만
+ * 사라진다.
  */
 
 export const EDIT_PLAN_SCHEMA = {
@@ -25,9 +36,10 @@ export const EDIT_PLAN_SCHEMA = {
             type: 'string',
             description: '수정할 문단의 id. 반드시 입력으로 받은 id 중 하나여야 한다.',
           },
-          oldText: {
+          checksum: {
             type: 'string',
-            description: '해당 문단의 현재 전체 텍스트. 한 글자도 바꾸지 말고 그대로 옮길 것.',
+            description:
+              '그 문단 줄의 대괄호 안에 적힌 검증코드. 계산하지 말고 그대로 옮겨 적을 것.',
           },
           newText: {
             type: 'string',
@@ -38,7 +50,7 @@ export const EDIT_PLAN_SCHEMA = {
             description: '이 문단을 바꾼 이유 한 문장.',
           },
         },
-        required: ['paragraphId', 'oldText', 'newText', 'reason'],
+        required: ['paragraphId', 'checksum', 'newText', 'reason'],
         additionalProperties: false,
       },
     },
@@ -49,19 +61,50 @@ export const EDIT_PLAN_SCHEMA = {
 
 export const SYSTEM_PROMPT = `너는 한글(HWPX) 문서의 텍스트를 수정하는 도구다.
 
-입력으로 문서의 문단 목록을 받는다. 각 문단은 id와 현재 텍스트를 가진다.
+입력으로 문서의 문단 목록을 받는다. 한 줄이 한 문단이고 형식은 다음과 같다.
+
+    [문단id 검증코드] (위치) "현재 텍스트"
+
+현재 텍스트는 JSON 문자열이다. 큰따옴표 안의 내용이 문단에 실제로 들어 있는
+글자 그대로다. 맨 앞의 들여쓰기 공백, 연속된 공백, 맨 뒤 공백도 전부 문서에
+실제로 있는 글자다. 눈에 잘 안 띈다고 없는 것으로 여기지 마라.
+
 사용자의 요청을 읽고, 바꿔야 하는 문단만 골라 수정 계획을 만든다.
 
 반드시 지킬 것:
 - paragraphId는 입력에 있는 id만 쓴다. 새로 만들지 않는다.
-- oldText는 그 문단의 현재 텍스트를 공백까지 그대로 옮긴다. 요약하거나 다듬지 않는다.
+- checksum은 그 문단 줄 대괄호 안의 검증코드를 그대로 옮긴다. 계산하거나
+  지어내지 않는다. 고른 문단과 다른 줄에서 가져오지 않는다.
 - newText는 그 문단을 통째로 대체할 텍스트다. 문단의 일부만 적지 않는다.
+- newText는 원문의 앞쪽 들여쓰기 공백과 글머리 기호를 그대로 두고 시작한다.
+  원문이 "   - 가나다"이면 newText도 공백 세 칸과 "- "로 시작해야 한다.
 - 바꿀 필요가 없는 문단은 계획에 넣지 않는다.
 - 문서의 말투, 문체, 서식 관례(번호 매기기, 기호, 들여쓰기 표시 등)를 유지한다.
 - 표 안 문단은 보통 짧은 값이다. 셀에 맞는 길이로 쓴다.
 - 줄바꿈 문자를 넣지 않는다. 문단을 나누거나 합칠 수 없다.
 - 요청이 문서와 관계없거나 바꿀 것이 없으면 operations를 빈 배열로 두고
   summary에 이유를 적는다.`
+
+/**
+ * 문단 텍스트 하나를 짧은 검증코드로 줄인다.
+ *
+ * 쓰임새는 하나다. AI가 "이 id의 문단"이라고 말할 때, 그 id와 AI가 실제로 보고
+ * 있던 내용이 같은 줄에서 온 것인지 확인한다. 그래서 필요한 성질도 하나다 —
+ * **같은 문자열이면 브라우저와 Worker에서 같은 값이 나올 것.**
+ * 보안 해시가 아니다. 8자리 hex면 모델이 옮겨 적기에 충분히 짧다.
+ *
+ * FNV-1a 32비트를 UTF-8 바이트에 돌린다. 공백 한 칸, 제로폭 문자 하나만
+ * 달라져도 값이 달라지므로 대조는 바이트 단위 그대로다.
+ */
+export function paragraphChecksum(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let hash = 0x811c9dc5
+  for (const byte of bytes) {
+    hash ^= byte
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0')
+}
 
 export interface DocumentParagraph {
   readonly id: string
@@ -77,7 +120,8 @@ export interface EditPlanRequest {
 
 export interface EditPlanOperation {
   readonly paragraphId: string
-  readonly oldText: string
+  /** 프롬프트에 적힌 검증코드를 옮겨 적은 값. `paragraphChecksum`으로 확인한다. */
+  readonly checksum: string
   readonly newText: string
   readonly reason: string
 }
@@ -117,7 +161,7 @@ export function parseEditPlanResponse(value: unknown): EditPlanResponse {
       throw new SchemaError(`operations[${position}]가 객체가 아닙니다.`)
     }
     const item = raw as Record<string, unknown>
-    for (const key of ['paragraphId', 'oldText', 'newText'] as const) {
+    for (const key of ['paragraphId', 'checksum', 'newText'] as const) {
       if (typeof item[key] !== 'string') {
         throw new SchemaError(`operations[${position}].${key}가 문자열이 아닙니다.`)
       }
@@ -125,9 +169,12 @@ export function parseEditPlanResponse(value: unknown): EditPlanResponse {
     if ((item['paragraphId'] as string).length === 0) {
       throw new SchemaError(`operations[${position}].paragraphId가 비어 있습니다.`)
     }
+    if ((item['checksum'] as string).length === 0) {
+      throw new SchemaError(`operations[${position}].checksum이 비어 있습니다.`)
+    }
     return {
       paragraphId: item['paragraphId'] as string,
-      oldText: item['oldText'] as string,
+      checksum: item['checksum'] as string,
       newText: item['newText'] as string,
       reason: typeof item['reason'] === 'string' ? item['reason'] : '',
     }

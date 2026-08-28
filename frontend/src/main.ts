@@ -5,9 +5,9 @@
  * 변경 확인 → 내려받기. 문서 편집기를 만들지 않는다.
  */
 
-import { AiError, collectParagraphs, requestEditPlan } from './ai/client'
+import { AiError, collectParagraphs, requestEditPlan, resolveEditPlan } from './ai/client'
 import { HwpxError } from './hwpx/package'
-import { PatchError, type EditPlan } from './hwpx/patch'
+import { PatchError } from './hwpx/patch'
 import { HwpxDocument } from './hwpx/session'
 import { attachLazyImages, type LazyImageController } from './preview/images'
 import { escapeHtml, renderDocument } from './preview/render'
@@ -121,17 +121,19 @@ async function runEdit(): Promise<void> {
   inFlight = controller
   try {
     const paragraphs = collectParagraphs(doc.model)
-    const plan = await requestEditPlan(instruction, paragraphs, controller.signal)
+    const response = await requestEditPlan(instruction, paragraphs, controller.signal)
 
-    if (plan.operations.length === 0) {
-      pending.replaceWith(note(plan.summary || '바꿀 내용을 찾지 못했습니다.', 'ai-note'))
+    if (response.operations.length === 0) {
+      pending.replaceWith(note(response.summary || '바꿀 내용을 찾지 못했습니다.', 'ai-note'))
       return
     }
 
-    const applied = doc.apply(plan as EditPlan)
+    // 원문(oldText)은 AI 응답이 아니라 방금 보낸 문단 목록에서 채운다.
+    const plan = resolveEditPlan(response, paragraphs)
+    const applied = doc.apply(plan)
     paintPreview()
     downloadButton.disabled = false
-    pending.replaceWith(renderChanges(plan.summary, applied))
+    pending.replaceWith(renderChanges(response.summary, applied))
     highlight(applied.map((change) => change.paragraphId))
   } catch (error) {
     pending.replaceWith(renderFailure(error))

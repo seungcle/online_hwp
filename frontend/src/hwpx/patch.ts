@@ -12,6 +12,10 @@
  * 치환 단위는 문단이다. `oldText`는 대상 문단의 **현재 전체 텍스트**여야 하고
  * `newText`가 그 자리를 통째로 대신한다. 부분 문자열을 다루지 않는 이유는
  * 같은 문구가 여러 번 나올 때 생기는 모호함을 아예 없애기 위해서다.
+ *
+ * `oldText`는 AI가 써 보낸 값이 아니다. 브라우저가 AI에게 보여 준 바로 그
+ * 문자열을 그대로 들고 있다가 넣는다(`ai/client.ts`의 `resolveEditPlan`).
+ * 그래서 아래 대조는 "계획을 세운 시점의 문서와 지금 문서가 같은가"를 묻는다.
  */
 
 import type { DocumentModel, Paragraph } from './document'
@@ -21,7 +25,10 @@ export interface ReplaceTextOperation {
   readonly type: 'replace_text'
   /** 대상 문단 id. 예: `s0-p12`. */
   readonly paragraphId: string
-  /** 적용 시점의 문단 전체 텍스트. 다르면 적용하지 않는다. */
+  /**
+   * 계획을 세운 시점의 문단 전체 텍스트. 지금 문서와 한 글자라도 다르면
+   * 계획 전체를 버린다. AI가 아니라 브라우저가 채운다.
+   */
   readonly oldText: string
   readonly newText: string
   /** AI가 남긴 변경 이유. 화면에 보여 주기만 한다. */
@@ -47,7 +54,13 @@ export interface AppliedChange {
 
 export interface PatchIssue {
   readonly paragraphId: string
-  readonly kind: 'unknown-target' | 'text-mismatch' | 'empty-paragraph' | 'duplicate-target'
+  readonly kind:
+    | 'unknown-target'
+    | 'text-mismatch'
+    | 'empty-paragraph'
+    | 'duplicate-target'
+    /** AI가 짚은 id와 AI가 보고 있던 내용이 어긋난다. `resolveEditPlan`이 낸다. */
+    | 'checksum-mismatch'
   readonly message: string
   /** 실제 문서의 현재 텍스트. 무엇이 어긋났는지 보여 주기 위해 함께 넘긴다. */
   readonly actualText?: string

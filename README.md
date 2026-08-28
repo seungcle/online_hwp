@@ -58,7 +58,7 @@ ZIP 압축은 표준 `DecompressionStream`/`CompressionStream`, XML은 자체 �
   → Worker (OpenAI 프록시, API 키는 Secret에만)
   → Edit Plan  (Structured Outputs로 형태 강제)
   → 브라우저에서 스키마 검증
-  → patch engine에서 oldText 대조 검증
+  → patch engine에서 oldText 대조 검증 (oldText는 브라우저가 보관한 원문)
   → 바이트 단위 patch
   → 새 HWPX
 ```
@@ -67,6 +67,8 @@ AI가 정하는 것은 "어느 문단을 무엇으로 바꿀지"까지다. XML�
 
 검증이 세 겹인 이유는 어느 하나만 뚫려도 문서가 망가지기 때문이다.
 `oldText`가 현재 문단 텍스트와 **한 글자라도** 다르면 그 계획은 통째로 버려진다.
+이때 `oldText`는 AI 응답이 아니라 브라우저가 AI에게 보여 준 원문 그대로다.
+AI는 문단 줄에 적힌 짧은 검증코드만 옮겨 적고, 그 값으로 id와 내용의 짝이 맞는지 확인한다.
 부분 적용은 하지 않는다.
 
 ### 가장 중요한 기술적 사실

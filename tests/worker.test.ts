@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import worker from '../backend/index'
+import { paragraphChecksum } from '../frontend/src/ai/schema'
 
 const realFetch = globalThis.fetch
 
@@ -87,7 +88,7 @@ describe('/api/edit-plan', () => {
     const plan = {
       summary: '기간을 바꿨습니다.',
       operations: [
-        { paragraphId: 's0-p0', oldText: '사업 기간은 1년 입니다.', newText: '사업 기간은 3개월입니다.', reason: '요청' },
+        { paragraphId: 's0-p0', checksum: paragraphChecksum(validBody.paragraphs[0]!.text), newText: '사업 기간은 3개월입니다.', reason: '요청' },
       ],
     }
     globalThis.fetch = vi.fn(async () => openAiReply(plan)) as never
@@ -116,8 +117,23 @@ describe('/api/edit-plan', () => {
     expect(sent.response_format.type).toBe('json_schema')
     expect(sent.response_format.json_schema.strict).toBe(true)
     // 문단 id와 텍스트만 담기고 파일 바이트는 없다.
-    expect(sent.messages[1].content).toContain('[s0-p0]')
+    expect(sent.messages[1].content).toContain('[s0-p0 ')
     expect(sent.messages[1].content).toContain('사업 기간은 1년 입니다.')
+  })
+
+  it('문단 텍스트를 JSON 문자열로 감싸 들여쓰기 공백까지 드러낸다', async () => {
+    // 예전 포맷은 `[id] (본문)    - 가나다` 처럼 맨텍스트를 붙였고, 구분자 공백과
+    // 문단이 원래 가진 들여쓰기가 섞여 모델이 공백 세 칸을 한 칸으로 줄여 읽었다.
+    const spy = vi.fn(async () => openAiReply({ summary: 's', operations: [] }))
+    globalThis.fetch = spy as never
+    const text = '   - 들여쓰기가 있는 문단  '
+    await worker.fetch(
+      post({ instruction: '다듬어줘', paragraphs: [{ id: 's0-p0', text, where: '본문' }] }),
+      env({ OPENAI_API_KEY: 'k' }),
+    )
+    const sent = JSON.parse((spy.mock.calls[0] as never as [string, RequestInit])[1].body as string)
+    const prompt = sent.messages[1].content as string
+    expect(prompt).toContain(`[s0-p0 ${paragraphChecksum(text)}] (본문) ${JSON.stringify(text)}`)
   })
 
   it('모델을 환경변수로 바꿀 수 있다', async () => {

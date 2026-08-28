@@ -3,11 +3,13 @@
 import { describe, expect, it } from 'vitest'
 import { buildHwpx } from './helpers/hwpx-fixture'
 import { loadHwpxBytes } from '../frontend/src/hwpx/package'
-import { collectParagraphs } from '../frontend/src/ai/client'
+import { collectParagraphs, resolveEditPlan } from '../frontend/src/ai/client'
+import { PatchError } from '../frontend/src/hwpx/patch'
 import {
   EDIT_PLAN_SCHEMA,
   MAX_INSTRUCTION_CHARS,
   SchemaError,
+  paragraphChecksum,
   parseEditPlanResponse,
   validateRequest,
 } from '../frontend/src/ai/schema'
@@ -17,7 +19,7 @@ describe('parseEditPlanResponse', () => {
     const plan = parseEditPlanResponse({
       summary: '기간을 바꿨습니다.',
       operations: [
-        { paragraphId: 's0-p1', oldText: '1년', newText: '3개월', reason: '요청대로' },
+        { paragraphId: 's0-p1', checksum: 'deadbeef', newText: '3개월', reason: '요청대로' },
       ],
     })
     expect(plan.operations).toHaveLength(1)
@@ -32,7 +34,7 @@ describe('parseEditPlanResponse', () => {
   it('reason이 없어도 받아들인다', () => {
     const plan = parseEditPlanResponse({
       summary: 's',
-      operations: [{ paragraphId: 'a', oldText: 'b', newText: 'c' }],
+      operations: [{ paragraphId: 'a', checksum: 'b', newText: 'c' }],
     })
     expect(plan.operations[0]!.reason).toBe('')
   })
@@ -51,16 +53,16 @@ describe('parseEditPlanResponse', () => {
     expect(() =>
       parseEditPlanResponse({
         summary: 's',
-        operations: [{ paragraphId: 's0-p1', oldText: 1, newText: 'x' }],
+        operations: [{ paragraphId: 's0-p1', checksum: 1, newText: 'x' }],
       }),
-    ).toThrow(/oldText/)
+    ).toThrow(/checksum/)
   })
 
   it('paragraphId가 비어 있으면 거부한다', () => {
     expect(() =>
       parseEditPlanResponse({
         summary: 's',
-        operations: [{ paragraphId: '', oldText: 'a', newText: 'b' }],
+        operations: [{ paragraphId: '', checksum: 'a', newText: 'b' }],
       }),
     ).toThrow(/비어 있습니다/)
   })
@@ -68,11 +70,11 @@ describe('parseEditPlanResponse', () => {
   it('AI가 임의 필드를 덧붙여도 무시하고 필요한 것만 취한다', () => {
     const plan = parseEditPlanResponse({
       summary: 's',
-      operations: [{ paragraphId: 'a', oldText: 'b', newText: 'c', 위험한필드: '<script>' }],
+      operations: [{ paragraphId: 'a', checksum: 'b', newText: 'c', 위험한필드: '<script>' }],
     })
     expect(Object.keys(plan.operations[0]!)).toEqual([
       'paragraphId',
-      'oldText',
+      'checksum',
       'newText',
       'reason',
     ])
@@ -149,5 +151,80 @@ describe('EDIT_PLAN_SCHEMA', () => {
     const item = EDIT_PLAN_SCHEMA.properties.operations.items
     expect(item.additionalProperties).toBe(false)
     expect([...item.required].sort()).toEqual(Object.keys(item.properties).sort())
+  })
+})
+
+describe('paragraphChecksum', () => {
+  it('같은 문자열이면 같은 값, 공백 한 칸만 달라도 다른 값', () => {
+    expect(paragraphChecksum('   - 가나다')).toBe(paragraphChecksum('   - 가나다'))
+    expect(paragraphChecksum('   - 가나다')).not.toBe(paragraphChecksum(' - 가나다'))
+    expect(paragraphChecksum('가나다')).not.toBe(paragraphChecksum('가나다 '))
+    // 제로폭 공백처럼 눈에 보이지 않는 차이도 잡는다.
+    expect(paragraphChecksum('가나다')).not.toBe(paragraphChecksum('가나\u200b다'))
+  })
+
+  it('짧은 hex 8자리다 — 모델이 옮겨 적을 수 있어야 한다', () => {
+    expect(paragraphChecksum('아무 문장')).toMatch(/^[0-9a-f]{8}$/)
+  })
+})
+
+describe('resolveEditPlan', () => {
+  const paragraphs = [
+    { id: 's0-p0', text: '   - 들여쓰기가 있는 문단', where: '본문' },
+    { id: 's0-p1', text: '평범한 문단', where: '본문' },
+  ]
+  const ok = (id: string, newText: string) => ({
+    paragraphId: id,
+    checksum: paragraphChecksum(paragraphs.find((p) => p.id === id)!.text),
+    newText,
+    reason: '요청',
+  })
+
+  it('oldText를 AI가 아니라 보낸 문단 목록에서 채운다', () => {
+    const plan = resolveEditPlan({ summary: 's', operations: [ok('s0-p0', '바뀐 문장')] }, paragraphs)
+    // 들여쓰기 공백 세 칸이 그대로 살아 있어야 한다. AI는 이 값을 만들지 않았다.
+    expect(plan.operations[0]!.oldText).toBe('   - 들여쓰기가 있는 문단')
+    expect(plan.operations[0]!.newText).toBe('바뀐 문장')
+    expect(plan.operations[0]!.type).toBe('replace_text')
+  })
+
+  it('AI가 원문을 다듬어 보내도 상관없다 — 원문을 AI에게 받지 않기 때문', () => {
+    // 예전에 실서비스를 막았던 바로 그 상황: 모델이 공백 세 칸을 한 칸으로 줄인다.
+    const response = {
+      summary: 's',
+      operations: [{ ...ok('s0-p0', '바뀐 문장'), oldText: ' - 들여쓰기가 있는 문단' } as never],
+    }
+    const plan = resolveEditPlan(response, paragraphs)
+    expect(plan.operations).toHaveLength(1)
+    expect(plan.operations[0]!.oldText).toBe('   - 들여쓰기가 있는 문단')
+  })
+
+  it('검증코드가 다른 문단의 것이면 계획 전체를 버린다', () => {
+    const crossed = {
+      paragraphId: 's0-p0',
+      checksum: paragraphChecksum(paragraphs[1]!.text),
+      newText: '바뀐 문장',
+      reason: '요청',
+    }
+    expect(() =>
+      resolveEditPlan({ summary: 's', operations: [crossed, ok('s0-p1', '다른 문장')] }, paragraphs),
+    ).toThrow(PatchError)
+    try {
+      resolveEditPlan({ summary: 's', operations: [crossed] }, paragraphs)
+    } catch (error) {
+      expect((error as PatchError).issues[0]!.kind).toBe('checksum-mismatch')
+    }
+  })
+
+  it('없는 문단 id를 거부한다', () => {
+    expect(() =>
+      resolveEditPlan({ summary: 's', operations: [{ ...ok('s0-p0', 'x'), paragraphId: 's9-p9' }] }, paragraphs),
+    ).toThrow(PatchError)
+  })
+
+  it('같은 문단을 두 번 고치려 하면 거부한다', () => {
+    expect(() =>
+      resolveEditPlan({ summary: 's', operations: [ok('s0-p0', 'a'), ok('s0-p0', 'b')] }, paragraphs),
+    ).toThrow(PatchError)
   })
 })

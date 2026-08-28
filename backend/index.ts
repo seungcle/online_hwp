@@ -17,6 +17,7 @@ import {
   EDIT_PLAN_SCHEMA,
   SYSTEM_PROMPT,
   SchemaError,
+  paragraphChecksum,
   parseEditPlanResponse,
   validateRequest,
   type EditPlanRequest,
@@ -162,15 +163,33 @@ async function handleEditPlan(request: Request, env: Env): Promise<Response> {
   }
 }
 
+/**
+ * 문단 목록을 프롬프트 한 덩어리로 만든다.
+ *
+ * 텍스트를 JSON 문자열로 감싸는 것이 핵심이다. 예전에는
+ * `[s0-p40] (본문)    - 임상적 연관성을…` 처럼 맨텍스트로 붙였는데, 이러면
+ * 구분자로 쓴 공백과 문단이 원래 가진 들여쓰기 공백이 화면에서 구별되지 않는다.
+ * 실제로 모델이 `"   - "`(공백 3칸)를 `" - "`(1칸)으로 줄여 읽어, 원문 대조와
+ * newText 들여쓰기가 함께 어긋났다. 큰따옴표 안에 넣으면 어디까지가 텍스트인지
+ * 모호할 여지가 없다.
+ *
+ * 검증코드는 여기서 계산해 붙인다. 브라우저가 응답을 확인할 때 같은 함수를
+ * 쓰므로, 프롬프트에 실린 값과 검증에 쓰는 값이 어긋날 수 없다.
+ */
 function renderUserMessage(payload: EditPlanRequest): string {
   const lines = payload.paragraphs.map(
-    (paragraph) => `[${paragraph.id}] (${paragraph.where}) ${paragraph.text}`,
+    (paragraph) =>
+      `[${paragraph.id} ${paragraphChecksum(paragraph.text)}] (${paragraph.where}) ` +
+      JSON.stringify(paragraph.text),
   )
   return [
     '## 사용자 요청',
     payload.instruction.trim(),
     '',
     '## 문서 문단 목록',
+    '형식: [문단id 검증코드] (위치) "현재 텍스트"',
+    '텍스트는 JSON 문자열이다. 따옴표 안의 공백까지 모두 실제 글자다.',
+    '',
     ...lines,
   ].join('\n')
 }
