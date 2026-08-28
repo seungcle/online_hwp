@@ -10,16 +10,17 @@
   // 스키마는 migrations/. 바인딩이 없어도 서비스는 돈다 — 매번 처음 보는 문서로
   // 처리될 뿐이다.
   //
-  // ⚠ database_id 는 계정마다 다르다. 아래 값이 그대로면 `wrangler deploy` 가 실패한다.
-  //   1) npx wrangler login
-  //   2) npx wrangler d1 create rhwp-templates      ← 출력된 database_id 를 아래에 붙인다
-  //   3) npm run db:remote                          ← 운영 D1 에 스키마 적용
-  //   4) npm run db:local                           ← 로컬 개발용
+  // 바인딩 이름은 backend/index.ts 의 `env.TEMPLATES` 와 같아야 한다.
+  // `wrangler d1 create` 가 제안하는 이름(rhwp_templates)을 그대로 쓰면 코드가 못 찾는다.
+  //
+  // 로컬 개발은 로컬 D1을 쓴다(`npm run db:local`). 여기에 "remote": true 를 넣으면
+  // `wrangler dev` 가 운영 D1에 직접 쓴다 — 확인용으로 돌린 양식이 운영 데이터에
+  // 섞이므로 기본값으로 두지 않는다.
   "d1_databases": [
     {
       "binding": "TEMPLATES",
       "database_name": "rhwp-templates",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "046c02fa-6aee-40d9-8a7d-b4a39132a6a2",
       "migrations_dir": "migrations"
     }
   ],
