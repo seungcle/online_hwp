@@ -16,6 +16,7 @@ interface FakeEnv {
   OPENAI_API_KEY?: string
   OPENAI_MODEL?: string
   OPENAI_REASONING_EFFORT?: string
+  OPENAI_TIMEOUT_MS?: string
 }
 
 function env(overrides: Partial<FakeEnv> = {}): FakeEnv {
@@ -132,8 +133,9 @@ describe('/api/edit-plan', () => {
       env({ OPENAI_API_KEY: 'k' }),
     )
     const sent = JSON.parse((spy.mock.calls[0] as never as [string, RequestInit])[1].body as string)
+    // LangChain은 추론 모델에 시스템 지시를 developer 역할로 보낸다. 순서가 핵심이다.
     expect(sent.messages.map((m: { role: string }) => m.role)).toEqual([
-      'system',
+      'developer',
       'user',
       'assistant',
       'user',
@@ -165,7 +167,8 @@ describe('/api/edit-plan', () => {
 
     const [url, init] = spy.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://api.openai.com/v1/chat/completions')
-    expect((init.headers as Record<string, string>)['authorization']).toBe('Bearer secret-key')
+    // OpenAI SDK는 헤더를 Headers 객체로 넘긴다.
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer secret-key')
     expect(await response.text()).not.toContain('secret-key')
   })
 
@@ -219,25 +222,41 @@ describe('/api/edit-plan', () => {
   })
 
   it('타임아웃을 504로 처리한다', async () => {
-    globalThis.fetch = vi.fn(async () => {
-      const error = new Error('aborted')
-      error.name = 'AbortError'
-      throw error
-    }) as never
-    const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
+    // LangChain이 오류를 감싸 던지므로 error.name 으로는 중단을 못 알아본다.
+    // 실제 흐름 그대로, 제한 시간이 지나 신호가 끊기는 상황을 만든다.
+    globalThis.fetch = vi.fn(
+      (_url: unknown, init: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            const error = new Error('aborted')
+            error.name = 'AbortError'
+            reject(error)
+          })
+        }),
+    ) as never
+    const response = await worker.fetch(
+      post(validBody),
+      env({ OPENAI_API_KEY: 'k', OPENAI_TIMEOUT_MS: '50' }),
+    )
     expect(response.status).toBe(504)
     expect((await response.json()).error.code).toBe('timeout')
   })
 
-  it('AI가 거절하면 이유를 전달한다', async () => {
+  it('AI가 답을 내놓지 않으면 422로 구분한다', async () => {
+    // 형식 오류(502)와 섞이면 안 된다. 사용자가 볼 문구가 달라야 한다.
+    // chat completions 경로에서 LangChain은 거절 사유를 버리고 내용만 비워 보낸다.
     globalThis.fetch = vi.fn(
       async () =>
-        new Response(JSON.stringify({ choices: [{ message: { refusal: '불가' } }] }), {
-          status: 200,
-        }),
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { role: 'assistant', content: null, refusal: '불가' } }],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
     ) as never
     const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
     expect(response.status).toBe(422)
+    expect((await response.json()).error.code).toBe('refused')
   })
 
   it('스키마에 맞지 않는 응답을 502로 막는다', async () => {
@@ -250,9 +269,10 @@ describe('/api/edit-plan', () => {
   it('JSON이 아닌 content를 502로 막는다', async () => {
     globalThis.fetch = vi.fn(
       async () =>
-        new Response(JSON.stringify({ choices: [{ message: { content: '그냥 문장' } }] }), {
-          status: 200,
-        }),
+        new Response(
+          JSON.stringify({ choices: [{ message: { role: 'assistant', content: '그냥 문장' } }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
     ) as never
     const response = await worker.fetch(post(validBody), env({ OPENAI_API_KEY: 'k' }))
     expect(response.status).toBe(502)

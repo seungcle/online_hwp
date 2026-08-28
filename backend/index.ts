@@ -13,6 +13,9 @@
  * 나머지 경로는 정적 자산이 그대로 처리한다.
  */
 
+import { ChatOpenAI } from '@langchain/openai'
+import { AIMessage, HumanMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
+
 import {
   EDIT_PLAN_SCHEMA,
   SYSTEM_PROMPT,
@@ -28,6 +31,8 @@ interface Env {
   OPENAI_API_KEY?: string
   OPENAI_MODEL?: string
   OPENAI_REASONING_EFFORT?: string
+  /** 제한 시간(ms). 테스트에서 짧게 두려고 열어 둔다. */
+  OPENAI_TIMEOUT_MS?: string
 }
 
 /**
@@ -42,7 +47,6 @@ const DEFAULT_MODEL = 'gpt-5.6-terra'
  * `OPENAI_REASONING_EFFORT`를 빈 값으로 두어 아예 보내지 않는다.
  */
 const DEFAULT_REASONING_EFFORT = 'low'
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
 /**
  * 문서 전체를 다시 쓰는 요청은 출력 토큰이 많아 오래 걸린다. 실측으로 135문단
  * 문서에 "쉽게 써줘"를 던지면 45초를 넘겨 죽었다. 사용자가 다시 시도하는 것보다
@@ -115,81 +119,117 @@ async function handleEditPlan(request: Request, env: Env): Promise<Response> {
     )
   }
 
-  const effort = env.OPENAI_REASONING_EFFORT ?? DEFAULT_REASONING_EFFORT
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const limit = Number(env.OPENAI_TIMEOUT_MS ?? '') || TIMEOUT_MS
+  const timer = setTimeout(() => controller.abort(), limit)
   try {
-    const upstream = await fetch(OPENAI_URL, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${env.OPENAI_API_KEY}`,
-        'content-type': 'application/json',
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: env.OPENAI_MODEL ?? DEFAULT_MODEL,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          // 지난 대화는 말만 싣는다. 문단 목록은 현재 문서 것으로 아래 한 번만.
-          ...(payload.history ?? []).map((turn) => ({
-            role: turn.role,
-            content: turn.content,
-          })),
-          { role: 'user', content: renderUserMessage(payload) },
-        ],
-        ...(effort ? { reasoning_effort: effort } : {}),
-        response_format: {
-          type: 'json_schema',
-          json_schema: { name: 'edit_plan', strict: true, schema: EDIT_PLAN_SCHEMA },
-        },
-      }),
-    })
-
-    if (!upstream.ok) {
-      const detail = await upstream.text()
-      console.error('openai error', upstream.status, detail.slice(0, 500))
-      if (upstream.status === 401 || upstream.status === 403) {
-        // 로컬에서 .dev.vars 자리표시자를 그대로 둔 경우가 대부분이다.
-        // 원인을 감추면 "AI 서비스 오류"만 보고 한참 헤매게 된다.
-        return fail(502, 'bad_key', 'OpenAI API 키가 올바르지 않습니다.')
-      }
-      return fail(
-        502,
-        'upstream_error',
-        upstream.status === 429
-          ? 'AI 요청이 몰려 있습니다. 잠시 후 다시 시도해 주세요.'
-          : 'AI 서비스에서 오류가 돌아왔습니다.',
-      )
-    }
-
-    const body = (await upstream.json()) as {
-      choices?: { message?: { content?: string; refusal?: string } }[]
-    }
-    const message = body.choices?.[0]?.message
-    if (message?.refusal) {
-      return fail(422, 'refused', `AI가 요청을 거절했습니다: ${message.refusal}`)
-    }
-    if (!message?.content) {
-      return fail(502, 'empty_response', 'AI가 빈 응답을 보냈습니다.')
-    }
-
-    // 여기서 한 번 검증하고, 브라우저에서 또 검증한다.
-    const plan = parseEditPlanResponse(JSON.parse(message.content))
+    const plan = parseEditPlanResponse(await callModel(payload, env, controller.signal))
+    // Worker에서 한 번 검증하고, 브라우저에서 또 검증한다.
     return Response.json(plan, {
       headers: { 'cache-control': 'no-store' },
     })
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
+    // LangChain이 오류를 감싸 던져 error.name 으로는 중단을 못 알아본다. 신호를 직접 본다.
+    if (controller.signal.aborted) {
       return fail(504, 'timeout', 'AI 응답이 너무 오래 걸립니다. 다시 시도해 주세요.')
+    }
+    if (error instanceof RefusedError) {
+      return fail(
+        422,
+        'refused',
+        error.message
+          ? `AI가 요청을 거절했습니다: ${error.message}`
+          : 'AI가 이 요청에는 답하지 못했습니다. 다르게 말해 주시면 다시 해 보겠습니다.',
+      )
     }
     if (error instanceof SchemaError || error instanceof SyntaxError) {
       return fail(502, 'invalid_plan', 'AI가 예상한 형식으로 답하지 않았습니다.')
     }
+    const mapped = mapUpstreamError(error)
+    if (mapped) return mapped
     console.error('edit-plan failed', error)
     return fail(500, 'internal_error', '수정 계획을 만들지 못했습니다.')
   } finally {
     clearTimeout(timer)
   }
+}
+
+/**
+ * 모델 호출. LangChain의 ChatOpenAI를 쓴다.
+ *
+ * 대화는 `BaseMessage` 배열로 조립한다. 시스템 지시 → 지난 대화 → 이번 요청
+ * 순서이고, 문단 목록은 **이번 요청에만** 실린다. 지난 턴은 주고받은 말뿐이다.
+ * 문서는 매 턴 바뀌므로 옛 문단 목록을 남겨 두면 모델이 낡은 텍스트를 짚는다.
+ *
+ * 대화 상태를 서버에 두지 않는다. 이 서비스는 파일도 대화도 저장하지 않는다고
+ * 첫 화면에 적혀 있고, 그 약속을 지키려면 기억은 브라우저가 들고 있어야 한다.
+ * 그래서 LangGraph의 checkpointer 같은 서버 저장 장치는 쓰지 않는다. Worker는
+ * 매 요청 무상태로 남고, 받은 대화를 그대로 모델에 넘길 뿐이다.
+ */
+async function callModel(
+  payload: EditPlanRequest,
+  env: Env,
+  signal: AbortSignal,
+): Promise<unknown> {
+  const effort = env.OPENAI_REASONING_EFFORT ?? DEFAULT_REASONING_EFFORT
+  const model = new ChatOpenAI({
+    apiKey: env.OPENAI_API_KEY,
+    model: env.OPENAI_MODEL ?? DEFAULT_MODEL,
+    ...(effort ? { reasoning: { effort: effort as never } } : {}),
+    // 실패는 우리 오류 화면으로 그대로 올린다. 조용히 다시 부르면 45초가 90초가 된다.
+    maxRetries: 0,
+  }).withStructuredOutput(EDIT_PLAN_SCHEMA, {
+    name: 'edit_plan',
+    strict: true,
+    // 원본 메시지도 함께 받는다. 모델이 거절했을 때 그 이유를 그대로 보여 주려면
+    // 파싱된 값만으로는 알 수 없다.
+    includeRaw: true,
+  })
+
+  const messages: BaseMessage[] = [new SystemMessage(SYSTEM_PROMPT)]
+  for (const turn of payload.history ?? []) {
+    messages.push(
+      turn.role === 'assistant' ? new AIMessage(turn.content) : new HumanMessage(turn.content),
+    )
+  }
+  messages.push(new HumanMessage(renderUserMessage(payload)))
+
+  const { raw, parsed } = (await model.invoke(messages, { signal })) as {
+    raw: { additional_kwargs?: { refusal?: string | null } }
+    parsed: unknown
+  }
+  // 모델이 거절하면 형식 오류와는 다르게 다뤄야 한다. 사용자가 볼 문구가 달라진다.
+  // chat completions 경로에서 LangChain은 거절 사유를 버리고 내용만 비워 보낸다.
+  // (사유까지 살리려면 Responses API로 옮겨야 한다. 지금은 그만한 이유가 없다.)
+  const refusal = raw?.additional_kwargs?.refusal
+  if (refusal) throw new RefusedError(refusal)
+  if (parsed === null || parsed === undefined) throw new RefusedError('')
+  return parsed
+}
+
+/** 모델이 답하지 않았다(거절 포함). 형식 오류와 구분한다. */
+class RefusedError extends Error {
+  override name = 'RefusedError'
+}
+
+/**
+ * LangChain이 감싸 던진 OpenAI 오류를 사용자 문구로 옮긴다.
+ * 상태 코드는 래핑돼도 남아 있어서 그걸 본다.
+ */
+function mapUpstreamError(error: unknown): Response | undefined {
+  const status = (error as { status?: number; response?: { status?: number } })?.status
+    ?? (error as { response?: { status?: number } })?.response?.status
+  if (status === undefined) return undefined
+  console.error('openai error', status, String((error as Error)?.message).slice(0, 300))
+  if (status === 401 || status === 403) {
+    // 로컬에서 .dev.vars 값을 잘못 넣은 경우가 대부분이다.
+    // 원인을 감추면 "AI 서비스 오류"만 보고 한참 헤매게 된다.
+    return fail(502, 'bad_key', 'OpenAI API 키가 올바르지 않습니다.')
+  }
+  if (status === 429) {
+    return fail(502, 'upstream_error', 'AI 요청이 몰려 있습니다. 잠시 후 다시 시도해 주세요.')
+  }
+  return fail(502, 'upstream_error', 'AI 서비스에서 오류가 돌아왔습니다.')
 }
 
 /**
