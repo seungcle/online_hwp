@@ -20,6 +20,7 @@ import { HwpxDocument } from './hwpx/session'
 import { attachLazyImages, type LazyImageController } from './preview/images'
 import { escapeHtml, renderDocument } from './preview/render'
 import { formatMs, Stopwatch } from './perf'
+import { clearCredential, isLoggedIn, saveCredential } from './auth'
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id)
@@ -27,6 +28,11 @@ const $ = <T extends HTMLElement>(id: string): T => {
   return element as T
 }
 
+const gate = $('gate')
+const gateForm = $<HTMLFormElement>('gate-form')
+const gateId = $<HTMLInputElement>('gate-id')
+const gatePw = $<HTMLInputElement>('gate-pw')
+const gateError = $('gate-error')
 const landing = $('landing')
 const landingError = $('landing-error')
 const workspace = $('workspace')
@@ -179,6 +185,12 @@ async function runEdit(): Promise<void> {
     appendDebug(response.debug)
     highlight(applied.map((change) => change.paragraphId))
   } catch (error) {
+    if (error instanceof AiError && error.code === 'unauthorized') {
+      clearCredential()
+      pending.replaceWith(note('로그인이 필요합니다. 다시 로그인해 주세요.', 'ai-msg ai-msg--error'))
+      showGate(error.message)
+      return
+    }
     pending.replaceWith(renderFailure(error))
   } finally {
     inFlight = null
@@ -407,6 +419,41 @@ function showLoading(message: string): void {
 function hideLoading(): void {
   loading.hidden = true
 }
+
+// ── 로그인 ────────────────────────────────────────────────
+//
+// 서버가 실제로 막는다(`backend/index.ts`). 이 화면은 자격증명을 받아 두는
+// 자리일 뿐이고, 여기를 지나쳐도 AI 호출은 서버에서 거절된다.
+
+function showGate(message?: string): void {
+  gate.hidden = false
+  landing.hidden = true
+  workspace.hidden = true
+  if (message) {
+    gateError.textContent = message
+    gateError.hidden = false
+  } else {
+    gateError.hidden = true
+  }
+}
+
+function hideGate(): void {
+  gate.hidden = true
+  landing.hidden = false
+}
+
+gateForm.addEventListener('submit', (event) => {
+  event.preventDefault()
+  const id = gateId.value.trim()
+  const password = gatePw.value
+  if (!id || !password) return
+  saveCredential(id, password)
+  gatePw.value = ''
+  hideGate()
+})
+
+if (isLoggedIn()) hideGate()
+else showGate()
 
 for (const input of [fileInput, fileInputReplace]) {
   input.addEventListener('change', () => {

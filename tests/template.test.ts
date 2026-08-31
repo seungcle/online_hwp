@@ -58,11 +58,19 @@ function requestBody(
   }
 }
 
+/** 테스트용 아이디·비밀번호. 실제 값은 Cloudflare Secret 에만 있다. */
+const USER = 'tester'
+const PASSWORD = 'secret'
+
 function post(body: unknown): Request {
   const json = JSON.stringify(body)
   return new Request('https://rhwp.co.kr/api/edit-plan', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'content-length': String(json.length) },
+    headers: {
+      'content-type': 'application/json',
+      'content-length': String(json.length),
+      authorization: `Basic ${Buffer.from(`${USER}:${PASSWORD}`, 'utf-8').toString('base64')}`,
+    },
     body: json,
   })
 }
@@ -71,6 +79,8 @@ function env(db?: TestD1) {
   return {
     ASSETS: { fetch: async () => new Response('') },
     OPENAI_API_KEY: 'k',
+    APP_USER: USER,
+    APP_PASSWORD: PASSWORD,
     ...(db ? { TEMPLATES: db } : {}),
   } as never
 }

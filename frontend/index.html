@@ -42,6 +42,26 @@
     </nav>
   </header>
 
+  <!-- 로그인. AI 호출을 쓸 수 있는 사람만 들어온다. -->
+  <main id="gate" class="landing" hidden>
+    <h1 class="landing-title">로그인</h1>
+    <p class="landing-sub">
+      AI 수정 기능은 발급받은 아이디로만 쓸 수 있습니다.
+    </p>
+    <form id="gate-form" class="gate-form" autocomplete="on">
+      <label class="gate-field">
+        <span>아이디</span>
+        <input id="gate-id" name="username" type="text" autocomplete="username" required />
+      </label>
+      <label class="gate-field">
+        <span>비밀번호</span>
+        <input id="gate-pw" name="password" type="password" autocomplete="current-password" required />
+      </label>
+      <button id="gate-submit" class="btn btn--primary" type="submit">들어가기</button>
+      <p id="gate-error" class="landing-error" hidden></p>
+    </form>
+  </main>
+
   <!-- 파일을 열기 전 -->
   <main id="landing" class="landing">
     <h1 class="landing-title">HWPX 양식은 그대로, 내용만 바꿉니다</h1>

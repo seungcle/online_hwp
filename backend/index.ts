@@ -54,6 +54,15 @@ interface Env {
    * 처리할 뿐이다. 바인딩이 빠졌다고 편집이 막히면 안 된다.
    */
   TEMPLATES?: D1Database
+  /**
+   * AI 호출을 쓸 수 있는 아이디와 비밀번호. Cloudflare Secret으로만 둔다.
+   *
+   * 저장소가 공개라 코드나 wrangler.jsonc 에 적으면 그대로 노출된다.
+   * 대단한 인증을 하려는 것이 아니라, 남이 우리 OpenAI 키로 프롬프트를
+   * 마구 던지는 것을 막는 최소한의 문턱이다.
+   */
+  APP_USER?: string
+  APP_PASSWORD?: string
 }
 
 /**
@@ -108,10 +117,55 @@ async function serveExactHtml(request: Request, env: Env, url: URL): Promise<Res
   })
 }
 
+/**
+ * 로그인 확인. `/api/edit-plan` 에만 건다.
+ *
+ * 나머지 경로는 그대로 열어 둔다. `ads.txt`, 네이버 소유확인, `robots.txt`,
+ * `sitemap.xml` 은 크롤러와 검색엔진이 읽어야 하는 도메인 자산이라 막으면
+ * 안 되고, 미리보기는 브라우저 안에서만 돌아 돈이 들지 않는다. 비용이 드는
+ * 것은 AI 호출 하나뿐이므로 거기만 막으면 된다.
+ *
+ * 아이디·비밀번호가 설정돼 있지 않으면 **막는다.** 설정을 빠뜨렸을 때 조용히
+ * 열려 있는 것보다 눈에 띄게 닫혀 있는 편이 낫다.
+ */
+function checkLogin(request: Request, env: Env): Response | undefined {
+  if (!env.APP_USER || !env.APP_PASSWORD) {
+    return fail(503, 'not_configured', '로그인이 아직 설정되지 않았습니다.')
+  }
+  const header = request.headers.get('authorization') ?? ''
+  const [scheme, encoded] = header.split(' ')
+  if (scheme?.toLowerCase() !== 'basic' || !encoded) {
+    return fail(401, 'unauthorized', '아이디와 비밀번호가 필요합니다.')
+  }
+  let decoded: string
+  try {
+    decoded = atob(encoded)
+  } catch {
+    return fail(401, 'unauthorized', '아이디와 비밀번호가 필요합니다.')
+  }
+  const at = decoded.indexOf(':')
+  const user = at < 0 ? decoded : decoded.slice(0, at)
+  const password = at < 0 ? '' : decoded.slice(at + 1)
+  if (!equals(user, env.APP_USER) || !equals(password, env.APP_PASSWORD)) {
+    return fail(401, 'unauthorized', '아이디 또는 비밀번호가 올바르지 않습니다.')
+  }
+  return undefined
+}
+
+/** 길이와 내용을 한 번에 흘리지 않도록 끝까지 비교한다. */
+function equals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
 async function handleEditPlan(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'POST') {
     return fail(405, 'method_not_allowed', 'POST로 요청해 주세요.')
   }
+  const denied = checkLogin(request, env)
+  if (denied) return denied
   if (!env.OPENAI_API_KEY) {
     return fail(
       503,

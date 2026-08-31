@@ -17,7 +17,15 @@ interface FakeEnv {
   OPENAI_MODEL?: string
   OPENAI_REASONING_EFFORT?: string
   OPENAI_TIMEOUT_MS?: string
+  APP_USER?: string
+  APP_PASSWORD?: string
 }
+
+/** 테스트용 아이디·비밀번호. 실제 값은 Cloudflare Secret 에만 있다. */
+const USER = 'tester'
+const PASSWORD = 'secret'
+const basic = (id = USER, password = PASSWORD): string =>
+  `Basic ${Buffer.from(`${id}:${password}`, 'utf-8').toString('base64')}`
 
 function env(overrides: Partial<FakeEnv> = {}): FakeEnv {
   return {
@@ -33,6 +41,8 @@ function env(overrides: Partial<FakeEnv> = {}): FakeEnv {
         return new Response('정적 자산', { status: 200, headers: { 'content-type': 'text/plain' } })
       },
     },
+    APP_USER: USER,
+    APP_PASSWORD: PASSWORD,
     ...overrides,
   }
 }
@@ -42,11 +52,15 @@ const validBody = {
   paragraphs: [{ id: 's0-p0', text: '사업 기간은 1년 입니다.', where: '본문', path: 's0/b0' }],
 }
 
-function post(body: unknown): Request {
+function post(body: unknown, auth: string | null = basic()): Request {
   const json = JSON.stringify(body)
   return new Request('https://rhwp.co.kr/api/edit-plan', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'content-length': String(json.length) },
+    headers: {
+      'content-type': 'application/json',
+      'content-length': String(json.length),
+      ...(auth ? { authorization: auth } : {}),
+    },
     body: json,
   })
 }
@@ -296,5 +310,85 @@ describe('자산 라우팅', () => {
     const response = await worker.fetch(new Request('https://rhwp.co.kr/guide/'), env())
     expect(response.status).toBe(200)
     expect(await response.text()).toBe('정적 자산')
+  })
+})
+
+
+// ── 로그인 ────────────────────────────────────────────────────────────
+
+describe('/api/edit-plan 로그인', () => {
+  const read = async (response: Response) =>
+    (await response.json()) as { error?: { code?: string; message?: string } }
+
+  it('자격증명이 없으면 401', async () => {
+    const response = await worker.fetch(
+      post(validBody, null),
+      env({ OPENAI_API_KEY: 'k' }),
+    )
+    expect(response.status).toBe(401)
+    expect((await read(response)).error?.code).toBe('unauthorized')
+  })
+
+  it('아이디가 틀리면 401', async () => {
+    const response = await worker.fetch(
+      post(validBody, basic('nope', PASSWORD)),
+      env({ OPENAI_API_KEY: 'k' }),
+    )
+    expect(response.status).toBe(401)
+  })
+
+  it('비밀번호가 틀리면 401', async () => {
+    const response = await worker.fetch(
+      post(validBody, basic(USER, 'wrong')),
+      env({ OPENAI_API_KEY: 'k' }),
+    )
+    expect(response.status).toBe(401)
+  })
+
+  it('Basic 이 아닌 방식은 401', async () => {
+    const response = await worker.fetch(
+      post(validBody, 'Bearer something'),
+      env({ OPENAI_API_KEY: 'k' }),
+    )
+    expect(response.status).toBe(401)
+  })
+
+  it('망가진 base64 도 401 — 예외로 새지 않는다', async () => {
+    const response = await worker.fetch(
+      post(validBody, 'Basic !!!not-base64!!!'),
+      env({ OPENAI_API_KEY: 'k' }),
+    )
+    expect(response.status).toBe(401)
+  })
+
+  it('설정되지 않았으면 열지 않고 503으로 닫는다', async () => {
+    const response = await worker.fetch(
+      post(validBody, null),
+      env({ OPENAI_API_KEY: 'k', APP_USER: undefined, APP_PASSWORD: undefined }),
+    )
+    expect(response.status).toBe(503)
+    expect((await read(response)).error?.code).toBe('not_configured')
+  })
+
+  it('맞으면 통과해 요청 검증까지 간다', async () => {
+    const response = await worker.fetch(
+      post({ instruction: '', paragraphs: [] }),
+      env({ OPENAI_API_KEY: 'k' }),
+    )
+    // 401 이 아니라 400 — 로그인은 지나갔고 본문 검증에서 걸렸다는 뜻이다.
+    expect(response.status).toBe(400)
+  })
+
+  it('정적 자산과 소유확인 파일은 로그인 없이 열린다', async () => {
+    const assets = env({ OPENAI_API_KEY: 'k' })
+    for (const path of ['/', '/robots.txt', '/ads.txt', '/guide/']) {
+      const response = await worker.fetch(new Request(`https://rhwp.co.kr${path}`), assets)
+      expect(response.status).toBe(200)
+    }
+    const naver = await worker.fetch(
+      new Request('https://rhwp.co.kr/naver1234.html'),
+      assets,
+    )
+    expect(naver.status).toBe(200)
   })
 })

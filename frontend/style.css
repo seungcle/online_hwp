@@ -473,3 +473,44 @@ body.debug .pv-p[data-split] { background: #fff8e1; }
   border: 1px dashed #cbd5e1;
   word-break: break-all;
 }
+
+
+/* ── 로그인 ─────────────────────────────────────────────── */
+
+.gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 320px;
+  margin: 28px auto 0;
+  text-align: left;
+}
+
+.gate-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-soft, #4b5563);
+}
+
+.gate-field input {
+  padding: 10px 12px;
+  font-size: 15px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+}
+
+.gate-field input:focus {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.gate-form .btn {
+  margin-top: 4px;
+}

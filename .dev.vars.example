@@ -16,3 +16,11 @@ OPENAI_API_KEY=
 # OPENAI_MODEL=gpt-5.6-terra
 # 선택. 비워 두면 low. 추론을 지원하지 않는 모델을 쓸 때는 빈 값으로 둔다.
 # OPENAI_REASONING_EFFORT=low
+
+# AI 호출을 쓸 수 있는 아이디와 비밀번호.
+# 저장소가 공개라 코드에 적지 않는다. 운영에서는 Cloudflare Secret으로 넣는다.
+#   npx wrangler secret put APP_USER
+#   npx wrangler secret put APP_PASSWORD
+# 설정하지 않으면 /api/edit-plan 이 503을 준다.
+APP_USER=your-id
+APP_PASSWORD=your-password

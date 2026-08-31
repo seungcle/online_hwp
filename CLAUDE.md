@@ -80,6 +80,18 @@ gh api repos/seungcle/online_hwp/commits/<sha>/check-runs \
 - 모델은 `gpt-5.6-terra`(균형 등급) + `reasoning_effort: low`. `OPENAI_MODEL`,
   `OPENAI_REASONING_EFFORT`로 바꿀 수 있다. 추론을 지원하지 않는 모델을 쓸 때는
   `OPENAI_REASONING_EFFORT`를 빈 값으로 둬야 400이 안 난다.
+- **저장소가 공개다.** 비밀번호·키를 코드나 `wrangler.jsonc`에 적으면 그대로 노출된다.
+  `APP_USER`/`APP_PASSWORD`는 AI 호출을 쓸 수 있는 아이디와 비밀번호이고
+  Cloudflare Secret으로만 둔다. 설정되지 않으면 `/api/edit-plan`이 503으로 닫힌다
+  (조용히 열려 있는 것보다 낫다). 막는 곳은 Worker다 — 화면의 로그인은 자격증명을
+  들고 있는 자리일 뿐이라 그것만으로는 아무것도 막지 못한다.
+  `/api/edit-plan`에만 건다. `ads.txt`·네이버 소유확인·`robots.txt`·`sitemap.xml`은
+  크롤러가 읽어야 하고, 미리보기는 브라우저에서만 돌아 돈이 들지 않는다.
+
+  ```bash
+  npx wrangler secret put APP_USER
+  npx wrangler secret put APP_PASSWORD
+  ```
 - `OPENAI_API_KEY`는 Cloudflare Secret. 번들에 절대 넣지 않는다.
   로컬에서는 `.dev.vars`(gitignore)에 두면 `wrangler dev`가 읽는다. `.dev.vars.example` 참고.
   없으면 `/api/edit-plan`이 503을 주고 나머지 기능은 정상 동작한다.

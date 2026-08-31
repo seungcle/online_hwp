@@ -8,6 +8,7 @@
 import { usableHeight, type Block, type DocumentModel, type TableCell } from '../hwpx/document'
 import { computeStructure, type DocumentStructure } from '../hwpx/fingerprint'
 import { analyzeTable, estimateTableHeight, walkTables } from '../hwpx/layout'
+import { authHeaders, clearCredential } from '../auth'
 import type { EditPlan, PatchIssue } from '../hwpx/patch'
 import {
   SchemaError,
@@ -181,7 +182,7 @@ export async function requestEditPlan(
   try {
     response = await fetch('/api/edit-plan', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...authHeaders() },
       body: JSON.stringify(payload),
       ...(signal ? { signal } : {}),
     })
@@ -193,6 +194,8 @@ export async function requestEditPlan(
   }
 
   if (!response.ok) {
+    // 자격증명이 더는 통하지 않으면 들고 있을 이유가 없다. 다시 로그인시킨다.
+    if (response.status === 401) clearCredential()
     const detail = await readError(response)
     throw new AiError(detail.message, detail.code)
   }
