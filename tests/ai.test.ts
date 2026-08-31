@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest'
 import { buildHwpx } from './helpers/hwpx-fixture'
 import { loadHwpxBytes } from '../frontend/src/hwpx/package'
 import { collectParagraphs, resolveEditPlan } from '../frontend/src/ai/client'
-import { PatchError } from '../frontend/src/hwpx/patch'
 import {
   EDIT_PLAN_SCHEMA,
   MAX_HISTORY_TURNS,
@@ -126,14 +125,25 @@ describe('validateRequest', () => {
 })
 
 describe('collectParagraphs', () => {
-  it('빈 문단을 빼고 표 위치를 표시한다', async () => {
+  it('표 위치에 표 번호와 같은 행 첫 칸을 함께 싣는다', async () => {
     const result = await loadHwpxBytes(await buildHwpx(), 'sample.hwpx')
     const paragraphs = collectParagraphs(result.model)
 
-    expect(paragraphs.every((p) => p.text.trim().length > 0)).toBe(true)
     expect(paragraphs.some((p) => p.where === '본문')).toBe(true)
-    expect(paragraphs.some((p) => p.where.startsWith('표 '))).toBe(true)
+    expect(paragraphs.some((p) => /^표\d+ \d+행\d+열/.test(p.where))).toBe(true)
     expect(paragraphs.map((p) => p.id)).toContain('s0-p0')
+  })
+
+  it('채울 자리가 없는 빈 문단은 보내지 않는다', async () => {
+    const result = await loadHwpxBytes(await buildHwpx(), 'sample.hwpx')
+    const paragraphs = collectParagraphs(result.model)
+    const byId = new Map(
+      result.model.sections.flatMap((s) => s.paragraphs).map((p) => [p.id, p]),
+    )
+    // 목록에 빈 문단이 있다면 그것은 반드시 채울 자리가 있는 값 칸이다.
+    for (const paragraph of paragraphs) {
+      if (paragraph.text.length === 0) expect(byId.get(paragraph.id)!.emptySlot).toBeDefined()
+    }
   })
 
   it('AI에 파일이나 XML을 보내지 않는다 — id/텍스트/위치/논리경로뿐', async () => {
@@ -186,7 +196,10 @@ describe('resolveEditPlan', () => {
   })
 
   it('oldText를 AI가 아니라 보낸 문단 목록에서 채운다', () => {
-    const plan = resolveEditPlan({ summary: 's', operations: [ok('s0-p0', '바뀐 문장')] }, paragraphs)
+    const { plan } = resolveEditPlan(
+      { summary: 's', operations: [ok('s0-p0', '바뀐 문장')] },
+      paragraphs,
+    )
     // 들여쓰기 공백 세 칸이 그대로 살아 있어야 한다. AI는 이 값을 만들지 않았다.
     expect(plan.operations[0]!.oldText).toBe('   - 들여쓰기가 있는 문단')
     // 앞 공백은 원문을 따른다 — 아래 '원문 앞뒤 공백' 묶음을 보라.
@@ -200,38 +213,87 @@ describe('resolveEditPlan', () => {
       summary: 's',
       operations: [{ ...ok('s0-p0', '바뀐 문장'), oldText: ' - 들여쓰기가 있는 문단' } as never],
     }
-    const plan = resolveEditPlan(response, paragraphs)
+    const { plan } = resolveEditPlan(response, paragraphs)
     expect(plan.operations).toHaveLength(1)
     expect(plan.operations[0]!.oldText).toBe('   - 들여쓰기가 있는 문단')
   })
 
-  it('검증코드가 다른 문단의 것이면 계획 전체를 버린다', () => {
+  it('검증코드가 어긋난 건만 건너뛰고 나머지는 살린다', () => {
+    // 예전에는 계획 전체를 버렸다. 실측하면 개별 오류율은 0.3%인데 넓은 요청의
+    // 10%가 통째로 실패했다 — 어긋난 한 건이 멀쩡한 수십 건을 데려갔다.
     const crossed = {
       paragraphId: 's0-p0',
       checksum: paragraphChecksum(paragraphs[1]!.text),
       newText: '바뀐 문장',
       reason: '요청',
     }
-    expect(() =>
-      resolveEditPlan({ summary: 's', operations: [crossed, ok('s0-p1', '다른 문장')] }, paragraphs),
-    ).toThrow(PatchError)
-    try {
-      resolveEditPlan({ summary: 's', operations: [crossed] }, paragraphs)
-    } catch (error) {
-      expect((error as PatchError).issues[0]!.kind).toBe('checksum-mismatch')
+    const { plan, skipped } = resolveEditPlan(
+      { summary: 's', operations: [crossed, ok('s0-p1', '다른 문장')] },
+      paragraphs,
+    )
+    expect(plan.operations.map((o) => o.paragraphId)).toEqual(['s0-p1'])
+    expect(skipped).toHaveLength(1)
+    expect(skipped[0]!.kind).toBe('checksum-mismatch')
+    expect(skipped[0]!.paragraphId).toBe('s0-p0')
+  })
+
+  it('id는 있는데 검증코드가 어긋나면 대상을 옮기지 않는다', () => {
+    // 되살리기의 유혹이 있는 자리다. 검증코드는 s0-p1을 가리키지만, 모델이
+    // 문단은 제대로 고르고 코드만 잘못 옮겼을 수도 있다. 알 수 없으면 안 고친다.
+    const crossed = {
+      paragraphId: 's0-p0',
+      checksum: paragraphChecksum(paragraphs[1]!.text),
+      newText: '바뀐 문장',
+      reason: '요청',
     }
+    const { plan, recovered } = resolveEditPlan({ summary: 's', operations: [crossed] }, paragraphs)
+    expect(plan.operations).toHaveLength(0)
+    expect(recovered).toBe(0)
   })
 
-  it('없는 문단 id를 거부한다', () => {
-    expect(() =>
-      resolveEditPlan({ summary: 's', operations: [{ ...ok('s0-p0', 'x'), paragraphId: 's9-p9' }] }, paragraphs),
-    ).toThrow(PatchError)
+  it('없는 id를 짚었어도 검증코드가 한 문단만 가리키면 그리로 되살린다', () => {
+    // id가 문서에 없다는 것은 id가 틀렸다는 뜻이다. 그때는 검증코드가 유일한 단서다.
+    const { plan, recovered, skipped } = resolveEditPlan(
+      { summary: 's', operations: [{ ...ok('s0-p0', '바뀐 문장'), paragraphId: 's9-p9' }] },
+      paragraphs,
+    )
+    expect(recovered).toBe(1)
+    expect(skipped).toHaveLength(0)
+    expect(plan.operations[0]!.paragraphId).toBe('s0-p0')
+    expect(plan.operations[0]!.oldText).toBe('   - 들여쓰기가 있는 문단')
   })
 
-  it('같은 문단을 두 번 고치려 하면 거부한다', () => {
-    expect(() =>
-      resolveEditPlan({ summary: 's', operations: [ok('s0-p0', 'a'), ok('s0-p0', 'b')] }, paragraphs),
-    ).toThrow(PatchError)
+  it('없는 id인데 검증코드도 문서에 없으면 그 건만 건너뛴다', () => {
+    const { plan, skipped } = resolveEditPlan(
+      {
+        summary: 's',
+        operations: [
+          { paragraphId: 's9-p9', checksum: 'deadbeef', newText: 'x', reason: '요청' },
+          ok('s0-p1', '다른 문장'),
+        ],
+      },
+      paragraphs,
+    )
+    expect(plan.operations.map((o) => o.paragraphId)).toEqual(['s0-p1'])
+    expect(skipped[0]!.kind).toBe('unknown-target')
+  })
+
+  it('같은 문단을 서로 다르게 고치라고 하면 그 문단만 건너뛴다', () => {
+    const { plan, skipped } = resolveEditPlan(
+      { summary: 's', operations: [ok('s0-p0', 'a'), ok('s0-p0', 'b'), ok('s0-p1', 'c')] },
+      paragraphs,
+    )
+    expect(plan.operations.map((o) => o.paragraphId)).toEqual(['s0-p1'])
+    expect(skipped[0]!.kind).toBe('duplicate-target')
+  })
+
+  it('같은 문단에 같은 내용을 두 번 적으면 한 번만 적용한다', () => {
+    const { plan, skipped } = resolveEditPlan(
+      { summary: 's', operations: [ok('s0-p1', '같은 문장'), ok('s0-p1', '같은 문장')] },
+      paragraphs,
+    )
+    expect(plan.operations).toHaveLength(1)
+    expect(skipped).toHaveLength(0)
   })
 })
 
@@ -248,8 +310,8 @@ describe('resolveEditPlan — 원문 앞뒤 공백', () => {
     reason: '요청',
   })
   const resolve = (id: string, newText: string) =>
-    resolveEditPlan({ summary: 's', operations: [op(id, newText)] }, paragraphs).operations[0]!
-      .newText
+    resolveEditPlan({ summary: 's', operations: [op(id, newText)] }, paragraphs).plan
+      .operations[0]!.newText
 
   it('모델이 앞 공백을 지워도 원문 그대로 되돌린다', () => {
     // 실측: gpt-4.1-mini는 프롬프트로 부탁해도 들여쓰기를 떨어뜨린다.
@@ -285,7 +347,7 @@ describe('resolveEditPlan — 내용이 같은 수정', () => {
 
   it('글자가 같으면 계획에서 뺀다', () => {
     // 적용하면 문단 조각이 하나로 합쳐져 형광펜 같은 서식이 사라진다.
-    const plan = resolveEditPlan(
+    const { plan } = resolveEditPlan(
       { summary: 's', operations: [op('s0-p0', '대상은 중학생입니다.'), op('s0-p2', '바뀐 문단')] },
       paragraphs,
     )
@@ -293,12 +355,12 @@ describe('resolveEditPlan — 내용이 같은 수정', () => {
   })
 
   it('앞뒤 공백을 되돌린 뒤 같아지는 경우도 뺀다', () => {
-    const plan = resolveEditPlan({ summary: 's', operations: [op('s0-p1', '들여쓰기 문단')] }, paragraphs)
+    const { plan } = resolveEditPlan({ summary: 's', operations: [op('s0-p1', '들여쓰기 문단')] }, paragraphs)
     expect(plan.operations).toHaveLength(0)
   })
 
   it('전부 같으면 빈 계획이 된다 — 오류가 아니다', () => {
-    const plan = resolveEditPlan({ summary: 's', operations: [op('s0-p0', '대상은 중학생입니다.')] }, paragraphs)
+    const { plan } = resolveEditPlan({ summary: 's', operations: [op('s0-p0', '대상은 중학생입니다.')] }, paragraphs)
     expect(plan.operations).toHaveLength(0)
     expect(plan.summary).toBe('s')
   })

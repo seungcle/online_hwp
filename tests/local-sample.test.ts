@@ -186,9 +186,18 @@ function independentParagraphTexts(xml: Uint8Array): string[] {
       }
       return
     }
-    if (token.kind === TokenKind.Empty) return
-
     const name = slice(xml, token.nameStart, token.nameEnd)
+    if (token.kind === TokenKind.Empty) {
+      // 탭과 강제 줄나눔은 글자가 아니지만 문단에서 자리를 차지한다.
+      // 문서 모델이 자리표를 남기므로 여기서도 같이 세야 한다.
+      const current = open[open.length - 1]
+      const top = stack[stack.length - 1]
+      if (current && (top?.endsWith(':t') || top?.endsWith(':run'))) {
+        if (name.endsWith(':tab')) current.parts.push('\t')
+        else if (name.endsWith(':lineBreak')) current.parts.push('\n')
+      }
+      return
+    }
     if (token.kind === TokenKind.Start) {
       stack.push(name)
       if (name.endsWith(':p')) {

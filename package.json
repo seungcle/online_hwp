@@ -15,7 +15,9 @@
     "db:local": "wrangler d1 migrations apply rhwp-templates --local",
     "db:remote": "wrangler d1 migrations apply rhwp-templates --remote",
     "template:check": "esbuild samples/check-template.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/check-template.mjs --log-level=warning && node node_modules/.cache/check-template.mjs",
-    "ai:check": "esbuild samples/check-ai.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/check-ai.mjs --log-level=warning && node node_modules/.cache/check-ai.mjs"
+    "ai:check": "esbuild samples/check-ai.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/check-ai.mjs --log-level=warning && node node_modules/.cache/check-ai.mjs",
+    "layout:lab": "esbuild samples/layout-lab.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/layout-lab.mjs --log-level=warning && node node_modules/.cache/layout-lab.mjs",
+    "layout:table": "esbuild samples/table-page-lab.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/table-page-lab.mjs --log-level=warning && node node_modules/.cache/table-page-lab.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

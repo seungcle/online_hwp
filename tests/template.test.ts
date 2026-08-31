@@ -238,7 +238,7 @@ describe('아는 양식으로 실제 문서를 고친다', () => {
     )
     expect(response.debug.templateLookup).toBe('hit')
 
-    const plan = resolveEditPlan(response, second.paragraphs)
+    const { plan } = resolveEditPlan(response, second.paragraphs)
     const applied = second.document.apply(plan)
     expect(applied).toHaveLength(1)
 
@@ -342,22 +342,23 @@ describe('잘못된 지도로 문서가 조용히 바뀌지 않는다', () => {
     // 아는 양식이라며 AI가 다른 문단의 검증코드를 들고 왔다고 치자.
     const target = paragraphs.find((p) => p.text === FIRST_FORM.title)!
     const other = paragraphs.find((p) => p.text === '항목')!
-    expect(() =>
-      resolveEditPlan(
-        {
-          summary: 's',
-          operations: [
-            {
-              paragraphId: target.id,
-              checksum: paragraphChecksum(other.text),
-              newText: '조용히 바뀌면 안 된다',
-              reason: '',
-            },
-          ],
-        },
-        paragraphs,
-      ),
-    ).toThrow(/확인되지 않아/)
+    const { plan, skipped } = resolveEditPlan(
+      {
+        summary: 's',
+        operations: [
+          {
+            paragraphId: target.id,
+            checksum: paragraphChecksum(other.text),
+            newText: '조용히 바뀌면 안 된다',
+            reason: '',
+          },
+        ],
+      },
+      paragraphs,
+    )
+    // 계획 전체를 던지지는 않지만, 확인되지 않은 이 수정은 문서에 닿지 않는다.
+    expect(plan.operations).toHaveLength(0)
+    expect(skipped.map((s) => s.kind)).toEqual(['checksum-mismatch'])
   })
 
   it('필드가 가리키는 문단이 사라지면 hit로 인정하지 않는다', async () => {

@@ -8,6 +8,7 @@
 import { Stopwatch } from '../perf'
 import { parseSection, buildDocumentModel, type DocumentModel } from './document'
 import type { ManifestItem } from './manifest'
+import { normalizeLayout, type LayoutReport, type LayoutScope } from './layout'
 import { applyPlan, type AppliedChange, type EditPlan } from './patch'
 import { loadHwpx, type HwpxMeta, type LoadResult } from './package'
 import { repackage } from './zip-writer'
@@ -81,9 +82,81 @@ export class HwpxDocument {
     return [...result.changes]
   }
 
-  /** 수정된 section만 갈아끼운 새 HWPX 바이트. */
-  async toBytes(): Promise<Uint8Array> {
-    return repackage(this.archive, this.sectionBytes)
+  /**
+   * 수정된 section만 갈아끼운 새 HWPX 바이트.
+   *
+   * 내보내기 직전에 낡은 줄 배치 캐시를 걷어낸다. 우리가 조판을 다시 하는 것이
+   * 아니라 한글이 다시 하게 만드는 것이다(`layout.ts`). 한 글자도 고치지 않은
+   * 문서라면 아무것도 하지 않는다 — 그때는 원본과 바이트 단위로 같아야 한다.
+   *
+   * 걷어낸 뒤 결과를 **다시 파싱해 확인한다.** 문단 수와 각 문단의 글자가
+   * 그대로여야 한다. 어긋나면 정규화를 통째로 버리고 정규화 이전 바이트로
+   * 돌아간다. 깨진 파일을 성공으로 내려보내지 않는다.
+   */
+  async toBytes(options: { layout?: LayoutScope | 'off' } = {}): Promise<Uint8Array> {
+    const scope = options.layout ?? 'all'
+    if (this.pristine || scope === 'off') {
+      return repackage(this.archive, this.sectionBytes)
+    }
+
+    const edited = [...new Set(this.changeLog.map((change) => change.paragraphId))]
+    // 어떤 칸을 어떤 글로 바꿨는지 알려 준다. 표가 페이지를 넘칠지 가늠하는 데 쓴다.
+    // 고치기 전 글자가 있어야 "한 줄에 몇 글자"를 잴 수 있다.
+    const changes = new Map(
+      this.changeLog.map((change) => [
+        change.paragraphId,
+        { from: change.oldText, to: change.newText },
+      ]),
+    )
+    const { sections, report } = normalizeLayout(
+      this.modelValue,
+      this.sectionBytes,
+      edited,
+      scope,
+      (id) => changes.get(id),
+    )
+    this.layoutReportValue = report
+
+    const normalized = new Map(this.sectionBytes)
+    for (const [name, bytes] of sections) normalized.set(name, bytes)
+
+    if (!this.textSurvives(normalized)) {
+      // 정규화가 문서를 바꿔 놓았다. 있을 수 없는 일이지만, 그때는 안 하는 편이 낫다.
+      this.layoutReportValue = {
+        clearedParagraphs: 0,
+        sections: [],
+        removedBytes: 0,
+        tablesMadeFlowable: [],
+        tablesStillStuck: [],
+      }
+      return repackage(this.archive, this.sectionBytes)
+    }
+    return repackage(this.archive, normalized)
+  }
+
+  private layoutReportValue: LayoutReport | undefined
+
+  /** 마지막 `toBytes()`에서 줄 배치 캐시를 얼마나 걷어냈는가. */
+  get layoutReport(): LayoutReport | undefined {
+    return this.layoutReportValue
+  }
+
+  /** 정규화 뒤에도 문단과 글자가 그대로인지 확인한다. */
+  private textSurvives(candidate: ReadonlyMap<string, Uint8Array>): boolean {
+    try {
+      for (const section of this.modelValue.sections) {
+        const bytes = candidate.get(section.name)
+        if (!bytes) return false
+        const reparsed = parseSection(bytes, section.index, section.name)
+        if (reparsed.paragraphs.length !== section.paragraphs.length) return false
+        for (let i = 0; i < reparsed.paragraphs.length; i += 1) {
+          if (reparsed.paragraphs[i]!.text !== section.paragraphs[i]!.text) return false
+        }
+      }
+      return true
+    } catch {
+      return false
+    }
   }
 
   /** 그림 하나를 blob URL로 꺼낸다. 같은 그림은 한 번만 만든다. */

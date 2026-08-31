@@ -18,7 +18,7 @@
  * 그래서 아래 대조는 "계획을 세운 시점의 문서와 지금 문서가 같은가"를 묻는다.
  */
 
-import type { DocumentModel, Paragraph } from './document'
+import type { DocumentModel, Paragraph, ParagraphPiece } from './document'
 import { escapeXmlText } from './xml'
 
 export interface ReplaceTextOperation {
@@ -61,6 +61,8 @@ export interface PatchIssue {
     | 'duplicate-target'
     /** AI가 짚은 id와 AI가 보고 있던 내용이 어긋난다. `resolveEditPlan`이 낸다. */
     | 'checksum-mismatch'
+    /** 탭·강제 줄나눔 자리표의 개수나 순서가 원문과 다르다. */
+    | 'anchor-mismatch'
   readonly message: string
   /** 실제 문서의 현재 텍스트. 무엇이 어긋났는지 보여 주기 위해 함께 넘긴다. */
   readonly actualText?: string
@@ -141,12 +143,34 @@ export function validatePlan(model: DocumentModel, plan: EditPlan): PatchIssue[]
       })
       continue
     }
-    if (target.paragraph.fragments.length === 0 && operation.newText.length > 0) {
+    // 빈 문단이라도 글자를 넣을 자리(빈 run)가 있으면 채운다. 자리가 아예 없을
+    // 때만 거절한다 — 그때는 문단 구조를 새로 만들어야 하는데 그건 범위 밖이다.
+    if (
+      target.paragraph.fragments.length === 0 &&
+      !target.paragraph.emptySlot &&
+      operation.newText.length > 0
+    ) {
       issues.push({
         paragraphId: operation.paragraphId,
         kind: 'empty-paragraph',
-        message: '빈 문단에는 글자를 넣을 수 없습니다. 이 프로토타입은 문단 구조를 만들지 않습니다.',
+        message: '이 칸에는 글자를 넣을 자리가 없습니다. 문단 구조는 만들지 않습니다.',
         actualText: '',
+      })
+    }
+    // 탭·강제 줄나눔은 우리가 만들거나 없앨 수 없다. 원문에 있던 그대로여야
+    // 제자리에 남는다. 개수나 순서가 달라지면 어디에 둘지 알 수 없다.
+    //
+    // 자리표가 **없는** 문단은 예전처럼 너그럽게 둔다. 모델이 넣은 줄바꿈은
+    // 공백으로 바꾸면 그만이고, 그것 때문에 수정을 통째로 버릴 이유가 없다.
+    const want = anchorChars(target.paragraph.text)
+    const got = anchorChars(operation.newText)
+    if (want.length > 0 && want !== got) {
+      issues.push({
+        paragraphId: operation.paragraphId,
+        kind: 'anchor-mismatch',
+        message:
+          '이 문단에는 탭이나 줄나눔이 들어 있습니다. 그 자리를 원문 그대로 두어야 합니다.',
+        actualText: target.paragraph.text,
       })
     }
   }
@@ -178,18 +202,32 @@ export function applyPlan(
   for (const operation of plan.operations) {
     const target = located.get(operation.paragraphId)!
     const list = edits.get(target.sectionName) ?? []
-    const fragments = target.paragraph.fragments
+    const slot = target.paragraph.emptySlot
 
-    fragments.forEach((fragment, position) => {
-      // 값은 첫 조각에 넣는다. 그래야 그 자리의 글꼴·서식이 그대로 적용된다.
-      // 나머지 조각은 비운다.
-      const replacement = position === 0 ? normalize(operation.newText) : ''
+    if (target.paragraph.fragments.length === 0 && slot) {
+      // 비어 있던 요소를 텍스트를 담은 요소로 넓힌다. charPr 참조는 그대로 남는다.
+      const body = escapeXmlText(normalize(operation.newText))
       list.push({
-        start: fragment.start,
-        end: fragment.end,
-        bytes: encoder.encode(escapeXmlText(replacement)),
+        start: slot.start,
+        end: slot.end,
+        bytes: encoder.encode(`${slot.before}${body}${slot.after}`),
       })
-    })
+    }
+
+    // 탭·강제 줄나눔은 자리를 차지하는 요소다. 건드리지 않고 **그 자리에 둔 채**
+    // 사이사이의 글자만 갈아끼운다. 예전에는 텍스트 노드만 보고 새 글자를 첫
+    // 조각에 몰아넣어, 목차 줄의 폭 29961짜리 탭이 그대로 남아 글자가 10cm씩
+    // 벌어졌다(실측).
+    for (const [chunk, pieces] of layoutChunks(target.paragraph, operation.newText)) {
+      pieces.forEach((piece, position) => {
+        // 구간의 첫 글자 조각에 몰아넣는다. 그래야 그 자리의 글꼴·서식이 남는다.
+        list.push({
+          start: piece.start,
+          end: piece.end,
+          bytes: encoder.encode(escapeXmlText(position === 0 ? chunk : '')),
+        })
+      })
+    }
 
     edits.set(target.sectionName, list)
     changes.push({
@@ -211,16 +249,65 @@ export function applyPlan(
   return { sections, changes }
 }
 
+/** 문자열에서 자리표만 순서대로 뽑는다. 개수와 순서를 함께 본다. */
+function anchorChars(text: string): string {
+  return (text.match(/[\t\n]/g) ?? []).join('')
+}
+
 /**
- * 문단 하나에 들어갈 수 없는 문자를 정리한다.
+ * 새 글자를 **자리표(탭·강제 줄나눔)를 기준으로 갈라** 각 구간의 글자 조각에
+ * 배정한다. 자리표 자체는 바이트를 건드리지 않으므로 원본 그대로 남는다.
  *
- * 줄바꿈은 공백으로 바꾼다. HWPX에서 진짜 줄바꿈은 문단을 새로 만들거나
- * 강제 줄나눔 요소를 넣어야 하는데, 둘 다 이번 범위(텍스트 편집)를 넘는다.
- * 실제 한글 문서를 조사했을 때도 강제 줄나눔 요소의 실물 사례를 확보하지
- * 못해, 추측으로 XML 요소를 만들어 넣지 않기로 했다.
+ * 자리표가 없는 문단(대부분)은 예전과 똑같이 동작한다 — 새 글자를 통째로 첫
+ * 조각에 넣고 나머지를 비운다. 이때는 줄바꿈·탭 문자를 공백으로 바꾼다.
+ * HWPX에서 진짜 줄나눔은 요소를 새로 만들어야 하는데 그건 이 범위를 넘는다.
+ *
+ * 자리표가 있는 문단은 `validatePlan`이 개수와 순서가 맞는지 미리 확인한다.
  */
+function layoutChunks(
+  paragraph: Paragraph,
+  newText: string,
+): [string, Extract<ParagraphPiece, { kind: 'text' }>[]][] {
+  const texts = paragraph.pieces.filter(
+    (piece): piece is Extract<ParagraphPiece, { kind: 'text' }> => piece.kind === 'text',
+  )
+  const anchors = paragraph.pieces.filter((piece) => piece.kind === 'anchor')
+  if (anchors.length === 0) {
+    return [[normalize(newText), texts]]
+  }
+
+  // 자리표를 기준으로 구간을 나눈다. 구간 수 = 자리표 수 + 1.
+  const chunks = splitOnAnchors(newText, anchors.map((anchor) => anchor.char))
+  const spans: Extract<ParagraphPiece, { kind: 'text' }>[][] = [[]]
+  for (const piece of paragraph.pieces) {
+    if (piece.kind === 'anchor') spans.push([])
+    else spans[spans.length - 1]!.push(piece)
+  }
+  return chunks.map((chunk, index) => [chunk, spans[index] ?? []])
+}
+
+/** 자리표 문자를 순서대로 잘라 구간 글자를 만든다. */
+function splitOnAnchors(text: string, chars: readonly string[]): string[] {
+  const out: string[] = []
+  let rest = text
+  for (const char of chars) {
+    const at = rest.indexOf(char)
+    if (at < 0) {
+      // validatePlan 이 먼저 막으므로 여기 오지 않는다. 와도 안전하게 끝낸다.
+      out.push(rest)
+      rest = ''
+      continue
+    }
+    out.push(rest.slice(0, at))
+    rest = rest.slice(at + char.length)
+  }
+  out.push(rest)
+  return out
+}
+
+/** 자리표가 없는 문단에서 문단 하나에 들어갈 수 없는 문자를 정리한다. */
 function normalize(text: string): string {
-  return text.replace(/\r\n?|\n/g, ' ')
+  return text.replace(/\r\n?|\n|\t/g, ' ')
 }
 
 export function spliceBytes(

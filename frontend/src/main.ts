@@ -5,7 +5,13 @@
  * 변경 확인 → 내려받기. 문서 편집기를 만들지 않는다.
  */
 
-import { AiError, collectParagraphs, requestEditPlan, resolveEditPlan } from './ai/client'
+import {
+  AiError,
+  collectParagraphs,
+  requestEditPlan,
+  resolveEditPlan,
+  type SkippedOperation,
+} from './ai/client'
 import { MAX_HISTORY_TURNS, type ConversationTurn, type EditPlanDebug } from './ai/schema'
 import { computeStructure } from './hwpx/fingerprint'
 import { HwpxError } from './hwpx/package'
@@ -156,17 +162,20 @@ async function runEdit(): Promise<void> {
     }
 
     // 원문(oldText)은 AI 응답이 아니라 방금 보낸 문단 목록에서 채운다.
-    const plan = resolveEditPlan(response, paragraphs)
+    const { plan, skipped } = resolveEditPlan(response, paragraphs)
     if (plan.operations.length === 0) {
-      // 계획은 왔지만 전부 원문과 같은 내용이었다.
-      pending.replaceWith(note(response.summary || '바꿀 내용을 찾지 못했습니다.', 'ai-note'))
+      // 전부 원문과 같은 내용이었거나, 확인되지 않아 전부 건너뛴 경우다.
+      const message = skipped.length
+        ? `${skipped.length}곳이 어느 문단을 가리키는지 확인되지 않아 수정하지 않았습니다. 한 번 더 말해 주시면 다시 해 보겠습니다.`
+        : response.summary || '바꿀 내용을 찾지 못했습니다.'
+      pending.replaceWith(note(message, 'ai-note'))
       appendDebug(response.debug)
       return
     }
     const applied = doc.apply(plan)
     paintPreview()
     downloadButton.disabled = false
-    pending.replaceWith(renderChanges(response.summary, applied))
+    pending.replaceWith(renderChanges(response.summary, applied, skipped))
     appendDebug(response.debug)
     highlight(applied.map((change) => change.paragraphId))
   } catch (error) {
@@ -180,6 +189,7 @@ async function runEdit(): Promise<void> {
 function renderChanges(
   summary: string,
   changes: readonly { paragraphId: string; oldText: string; newText: string; reason?: string }[],
+  skipped: readonly SkippedOperation[] = [],
 ): HTMLElement {
   const box = document.createElement('div')
   box.className = 'ai-msg ai-msg--result'
@@ -193,10 +203,16 @@ function renderChanges(
       </li>`,
     )
     .join('')
+  // 건너뛴 것이 있으면 숨기지 않는다. 몇 곳을 왜 못 고쳤는지 알아야
+  // 사용자가 그 부분만 다시 말할 수 있다.
+  const note = skipped.length
+    ? `<p class="ai-hint-inline">${skipped.length}곳은 어느 문단을 가리키는지 확인되지 않아 그대로 두었습니다.</p>`
+    : ''
   box.innerHTML =
     `<p class="ai-summary">${escapeHtml(summary)}</p>` +
     `<p class="ai-count">${changes.length}곳을 수정했습니다.</p>` +
-    `<ul class="diff">${items}</ul>`
+    `<ul class="diff">${items}</ul>` +
+    note
   return box
 }
 

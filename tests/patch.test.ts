@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { buildHwpx, SECTION_XML } from './helpers/hwpx-fixture'
+import { BLANK_FORM_XML, buildHwpx, SECTION_XML, TOC_SECTION_XML } from './helpers/hwpx-fixture'
 import { loadHwpxBytes } from '../frontend/src/hwpx/package'
 import { HwpxDocument } from '../frontend/src/hwpx/session'
 import { PatchError, applyPlan, validatePlan, type EditPlan } from '../frontend/src/hwpx/patch'
@@ -276,19 +276,26 @@ describe('applyPlan — 검증 실패 시 아무것도 바꾸지 않는다', () 
     expect(issues[0]!.kind).toBe('duplicate-target')
   })
 
-  it('빈 문단에 글자를 넣으려 하면 거부한다', async () => {
+  it('빈 문단이라도 채울 자리가 있으면 넣는다', async () => {
+    // 예전에는 빈 문단을 통째로 거절했다. 그러면 양식의 값 칸을 채울 수 없고,
+    // AI가 대신 옆의 라벨을 덮어쓴다. 자리가 있으면 채우는 것이 맞다.
     const document = await openDocument()
     const empty = document.model.sections[0]!.paragraphs.find((p) => p.fragments.length === 0)!
-    const issues = validatePlan(
-      document.model,
-      plan([{ type: 'replace_text', paragraphId: empty.id, oldText: '', newText: '새 내용' }]),
-    )
-    expect(issues[0]!.kind).toBe('empty-paragraph')
-    expect(() =>
-      document.apply(
+    expect(empty.emptySlot).toBeDefined()
+    expect(
+      validatePlan(
+        document.model,
         plan([{ type: 'replace_text', paragraphId: empty.id, oldText: '', newText: '새 내용' }]),
       ),
-    ).toThrow(PatchError)
+    ).toEqual([])
+    const applied = document.apply(
+      plan([{ type: 'replace_text', paragraphId: empty.id, oldText: '', newText: '새 내용' }]),
+    )
+    expect(applied).toHaveLength(1)
+    const again = await loadHwpxBytes(await document.toBytes(), 'again.hwpx')
+    expect(
+      again.model.sections.flatMap((section) => section.paragraphs.map((p) => p.text)),
+    ).toContain('새 내용')
   })
 
   it('문제를 첫 건에서 멈추지 않고 모두 모아 준다', async () => {
@@ -416,3 +423,195 @@ async function reparse(document: HwpxDocument): Promise<string[]> {
   const reopened = await loadHwpxBytes(await document.toBytes(), 'check.hwpx')
   return reopened.model.sections.flatMap((section) => texts(section.blocks))
 }
+
+
+// ── 빈 양식 칸 채우기 ────────────────────────────────────────
+
+describe('값이 비어 있는 양식 칸', () => {
+  const openBlankForm = async () => {
+    const bytes = await buildHwpx({ sections: [BLANK_FORM_XML] })
+    const loaded = await loadHwpxBytes(bytes, 'form.hwpx')
+    const document = HwpxDocument.fromLoadResult(loaded)
+    const paragraphs = document.model.sections.flatMap((section) => section.paragraphs)
+    // 표를 감싼 바깥 문단도 텍스트가 없다. 채울 자리가 있는 것만 값 칸이다.
+    const blanks = paragraphs.filter((paragraph) => paragraph.emptySlot !== undefined)
+    return { bytes, document, paragraphs, blanks }
+  }
+
+  it('빈 run과 빈 hp:t 모두 채울 자리로 잡힌다', async () => {
+    const { blanks } = await openBlankForm()
+    expect(blanks).toHaveLength(2)
+    expect(blanks.every((paragraph) => paragraph.text.length === 0)).toBe(true)
+    // hp:t 가 이미 있으면 그쪽을 쓴다 — 건드리는 바이트가 적고 run이 그대로 남는다.
+    expect(blanks.map((paragraph) => paragraph.emptySlot!.rank).sort()).toEqual([1, 2])
+  })
+
+  it('빈 칸을 채우면 다시 열었을 때 그 글자가 들어 있다', async () => {
+    const { document, blanks } = await openBlankForm()
+    const applied = document.apply({
+      summary: '양식 채우기',
+      operations: blanks.map((paragraph, index) => ({
+        type: 'replace_text' as const,
+        paragraphId: paragraph.id,
+        oldText: '',
+        newText: index === 0 ? '세종팀' : '010-1234-5678',
+      })),
+    })
+    expect(applied).toHaveLength(2)
+
+    const again = await loadHwpxBytes(await document.toBytes(), 'form.hwpx')
+    const texts = again.model.sections.flatMap((section) =>
+      section.paragraphs.map((paragraph) => paragraph.text),
+    )
+    expect(texts).toContain('세종팀')
+    expect(texts).toContain('010-1234-5678')
+    // 라벨은 그대로 남아야 한다. 이 기능이 없을 때 AI가 덮어쓰던 자리다.
+    expect(texts).toContain('팀 명')
+    expect(texts).toContain('연락처')
+  })
+
+  it('채운 뒤에도 글꼴 참조(charPr)가 원본 그대로다', async () => {
+    const { document, blanks } = await openBlankForm()
+    const blank = blanks.find((paragraph) => paragraph.emptySlot?.rank === 1)!
+    document.apply({
+      summary: 's',
+      operations: [
+        { type: 'replace_text', paragraphId: blank.id, oldText: '', newText: '세종팀' },
+      ],
+    })
+    const archive = ZipArchive.open(await document.toBytes())
+    const xml = new TextDecoder().decode(await archive.read('Contents/section0.xml'))
+    expect(xml).toContain('<hp:run charPrIDRef="30"><hp:t>세종팀</hp:t></hp:run>')
+  })
+
+  it('XML 이스케이프가 필요한 값도 안전하게 들어간다', async () => {
+    const { document, blanks } = await openBlankForm()
+    const blank = blanks[0]!
+    document.apply({
+      summary: 's',
+      operations: [
+        { type: 'replace_text', paragraphId: blank.id, oldText: '', newText: 'A & B < C' },
+      ],
+    })
+    const again = await loadHwpxBytes(await document.toBytes(), 'form.hwpx')
+    const texts = again.model.sections.flatMap((section) =>
+      section.paragraphs.map((paragraph) => paragraph.text),
+    )
+    expect(texts).toContain('A & B < C')
+  })
+
+  it('채울 자리가 아예 없는 빈 문단은 여전히 거절한다', async () => {
+    // 기본 fixture 5번은 run 안에 빈 hp:t 가 있어 채울 수 있다. 자리가 없는
+    // 문단을 흉내 내려면 run 자체가 없는 문단을 쓴다.
+    const section =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' +
+      '<hs:sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" ' +
+      'xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core" ' +
+      'xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section">' +
+      '<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" ' +
+      'merged="0"><hp:linesegarray/></hp:p>' +
+      '</hs:sec>'
+    const parsed = parseSection(new TextEncoder().encode(section), 0, 'Contents/section0.xml')
+    const model = { sections: [parsed], stats: {} as never }
+    const plan: EditPlan = {
+      operations: [
+        { type: 'replace_text', paragraphId: 's0-p0', oldText: '', newText: '넣을 수 없다' },
+      ],
+    }
+    expect(validatePlan(model as never, plan).map((issue) => issue.kind)).toEqual([
+      'empty-paragraph',
+    ])
+  })
+})
+
+
+// ── 탭·강제 줄나눔이 섞인 문단 ────────────────────────────────────────
+
+describe('자리를 차지하는 요소(탭·줄나눔)', () => {
+  const openToc = async () => {
+    const bytes = await buildHwpx({ sections: [TOC_SECTION_XML] })
+    const loaded = await loadHwpxBytes(bytes, 'toc.hwpx')
+    const document = HwpxDocument.fromLoadResult(loaded)
+    return { document, paragraphs: document.model.sections[0]!.paragraphs }
+  }
+
+  it('탭과 줄나눔을 문단 텍스트에 자리표로 남긴다', async () => {
+    const { paragraphs } = await openToc()
+    expect(paragraphs[0]!.text).toBe('Ⅰ. 훈련과정 개요 \t 01')
+    expect(paragraphs[1]!.text).toBe('앞\n뒤')
+    expect(paragraphs[2]!.text).toBe('탭이 없는 평범한 문단')
+  })
+
+  it('글자를 바꿔도 탭이 제자리에 그대로 남는다', async () => {
+    const { document, paragraphs } = await openToc()
+    const toc = paragraphs[0]!
+    document.apply({
+      operations: [
+        {
+          type: 'replace_text',
+          paragraphId: toc.id,
+          oldText: toc.text,
+          newText: 'Ⅰ. 새로 쓴 아주 긴 훈련과정 개요 제목 \t 07',
+        },
+      ],
+    })
+    const out = await document.toBytes()
+    const xml = new TextDecoder().decode(await ZipArchive.open(out).read('Contents/section0.xml'))
+
+    // 탭 요소가 폭까지 원본 그대로여야 한다. 이것이 지워지거나 옮겨지면 안 된다.
+    expect(xml).toContain('<hp:tab width="29961" leader="3" type="3"/>')
+    // 글자는 탭의 앞뒤로 갈라져 들어간다 — 한쪽에 몰리면 10cm 공백이 생긴다.
+    expect(xml).toContain('<hp:t>Ⅰ. 새로 쓴 아주 긴 훈련과정 개요 제목 </hp:t>')
+    expect(xml).toContain('<hp:t> 07</hp:t>')
+
+    const again = await loadHwpxBytes(out, 'again.hwpx')
+    expect(again.model.sections[0]!.paragraphs[0]!.text).toBe(
+      'Ⅰ. 새로 쓴 아주 긴 훈련과정 개요 제목 \t 07',
+    )
+  })
+
+  it('강제 줄나눔도 제자리에 남는다', async () => {
+    const { document, paragraphs } = await openToc()
+    const target = paragraphs[1]!
+    document.apply({
+      operations: [
+        { type: 'replace_text', paragraphId: target.id, oldText: target.text, newText: '위\n아래' },
+      ],
+    })
+    const xml = new TextDecoder().decode(
+      await ZipArchive.open(await document.toBytes()).read('Contents/section0.xml'),
+    )
+    expect(xml).toContain('<hp:lineBreak/>')
+    expect((await loadHwpxBytes(await document.toBytes(), 'x.hwpx')).model.sections[0]!.paragraphs[1]!.text)
+      .toBe('위\n아래')
+  })
+
+  it('탭을 빠뜨린 수정은 거부한다 — 어디에 둘지 알 수 없다', async () => {
+    const { document, paragraphs } = await openToc()
+    const toc = paragraphs[0]!
+    const plan = {
+      operations: [
+        {
+          type: 'replace_text' as const,
+          paragraphId: toc.id,
+          oldText: toc.text,
+          newText: 'Ⅰ. 탭을 빠뜨린 제목 01',
+        },
+      ],
+    }
+    expect(validatePlan(document.model, plan).map((i) => i.kind)).toEqual(['anchor-mismatch'])
+    expect(() => document.apply(plan)).toThrow(PatchError)
+  })
+
+  it('자리표가 없는 문단은 예전처럼 너그럽다 — 줄바꿈은 공백으로', async () => {
+    const { document, paragraphs } = await openToc()
+    const plain = paragraphs[2]!
+    document.apply({
+      operations: [
+        { type: 'replace_text', paragraphId: plain.id, oldText: plain.text, newText: '한 줄\n두 줄' },
+      ],
+    })
+    const again = await loadHwpxBytes(await document.toBytes(), 'x.hwpx')
+    expect(again.model.sections[0]!.paragraphs[2]!.text).toBe('한 줄 두 줄')
+  })
+})

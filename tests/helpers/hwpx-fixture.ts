@@ -35,6 +35,108 @@ export function text(value: string): string {
   return `<hp:t>${value}</hp:t>`
 }
 
+/**
+ * 값이 비어 있는 양식 칸. 실제 한글이 만드는 형태 그대로 hp:t가 아예 없다.
+ * 이런 칸을 채우지 못하면 AI가 대신 옆의 라벨을 덮어쓴다.
+ */
+export function emptyRun(charPr = '30'): string {
+  return `<hp:run charPrIDRef="${charPr}"/>`
+}
+
+/**
+ * 목차 줄. 실제 한글이 만드는 형태 그대로 **hp:t 안에 hp:tab** 이 들어 있다.
+ * 탭은 폭을 가지므로(실측 29961 HWPUNIT ≈ 10.5cm) 글자만 갈아끼우고 탭을 그냥
+ * 두면 그 폭이 통째로 남아 글자가 벌어진다.
+ */
+export const TOC_SECTION_XML =
+  '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' +
+  `<hs:sec ${NS}>` +
+  para(
+    run(text('Ⅰ. 훈련과정 개요 ')) +
+      run('<hp:t><hp:tab width="29961" leader="3" type="3"/></hp:t>', '30') +
+      run(text(' 01'), '31'),
+  ) +
+  para(run('<hp:t>앞<hp:lineBreak/>뒤</hp:t>')) +
+  para(run(text('탭이 없는 평범한 문단'))) +
+  '</hs:sec>'
+
+/**
+ * 용지 설정과 **개체로 취급되는 표** 하나. 표가 페이지를 넘칠 때 무엇을
+ * 바꿔야 하는지 시험하는 데 쓴다.
+ *
+ * `treatAsChar="0"` 은 글자처럼 취급하지 않는다는 뜻이라 페이지를 넘겨
+ * 나뉘지 않는다. `pageBreak="TABLE"` 도 마찬가지다. 둘 다 속성이라 고칠 수 있다.
+ */
+export function pageTableXml(options: {
+  rows?: number
+  cellHeight?: number
+  treatAsChar?: '0' | '1'
+  pageBreak?: string
+  rowSpan?: number
+} = {}): string {
+  const rowCount = options.rows ?? 4
+  const height = options.cellHeight ?? 4000
+  const span = options.rowSpan ?? 1
+  const cells = (r: number): string =>
+    [0, 1]
+      .map(
+        (c) =>
+          '<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" ' +
+          'borderFillIDRef="1"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" ' +
+          `vertAlign="CENTER" linkListIDRef="0" textWidth="0" textHeight="0">${para(
+            run(text(`${r}행${c}열`)),
+          )}</hp:subList>` +
+          `<hp:cellAddr colAddr="${c}" rowAddr="${r}"/>` +
+          `<hp:cellSpan colSpan="1" rowSpan="${c === 0 ? span : 1}"/>` +
+          `<hp:cellSz width="20000" height="${height}"/>` +
+          '<hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>',
+      )
+      .join('')
+  const body = Array.from({ length: rowCount }, (_u, r) => `<hp:tr>${cells(r)}</hp:tr>`).join('')
+  const tbl =
+    `<hp:tbl id="1" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" lock="0" ` +
+    `pageBreak="${options.pageBreak ?? 'CELL'}" repeatHeader="1" rowCnt="${rowCount}" colCnt="2" ` +
+    `cellSpacing="0" borderFillIDRef="1" noAdjust="1">` +
+    `<hp:sz width="40000" widthRelTo="ABSOLUTE" height="${height * rowCount}" heightRelTo="ABSOLUTE" protect="0"/>` +
+    `<hp:pos treatAsChar="${options.treatAsChar ?? '0'}" affectLSpacing="0" flowWithText="1" ` +
+    'allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" ' +
+    'horzAlign="LEFT" vertOffset="0" horzOffset="0"/>' +
+    '<hp:outMargin left="0" right="0" top="0" bottom="0"/>' +
+    `<hp:inMargin left="510" right="510" top="141" bottom="141"/>${body}</hp:tbl>`
+
+  return (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' +
+    `<hs:sec ${NS}>` +
+    // 용지 설정. 쓸 수 있는 높이 = 84186 - 4251*2 - 2834*2 = 70016
+    para(
+      '<hp:run charPrIDRef="0"><hp:ctrl><hp:colPr id="" type="NEWSPAPER" layout="LEFT" ' +
+        'colCount="1" sameSz="1" sameGap="0"/></hp:ctrl></hp:run>' +
+        '<hp:secPr><hp:pagePr landscape="WIDELY" width="59528" height="84186" gutterType="LEFT_ONLY">' +
+        '<hp:margin header="2834" footer="2834" gutter="0" left="5669" right="5669" ' +
+        'top="4251" bottom="4251"/></hp:pagePr></hp:secPr>',
+    ) +
+    para(run(tbl)) +
+    '</hs:sec>'
+  )
+}
+
+/** `라벨 | 빈 값` 두 칸짜리 양식. 빈 칸의 모양을 두 가지 다 담았다. */
+export const BLANK_FORM_XML =
+  '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' +
+  `<hs:sec ${NS}>` +
+  para(
+    run(
+      table([
+        // 1) 빈 run — hp:t 가 없다.
+        cell(para(run(text('팀 명'))), 0, 0) + cell(para(emptyRun()), 1, 0),
+        // 2) 빈 hp:t — 요소는 있고 안이 비었다.
+        cell(para(run(text('연락처'))), 0, 1) + cell(para(run('<hp:t/>', '31')), 1, 1),
+      ]),
+    ),
+  ) +
+  para(run(text('아래는 본문입니다.'))) +
+  '</hs:sec>'
+
 export function cell(inner: string, col = 0, row = 0): string {
   return (
     '<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" ' +

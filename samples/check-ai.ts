@@ -26,7 +26,6 @@ import { loadHwpxBytes } from '../frontend/src/hwpx/package'
 import { HwpxDocument } from '../frontend/src/hwpx/session'
 import { collectParagraphs, resolveEditPlan } from '../frontend/src/ai/client'
 import { paragraphChecksum, parseEditPlanResponse } from '../frontend/src/ai/schema'
-import { PatchError } from '../frontend/src/hwpx/patch'
 
 const endpoint = process.env['AI_CHECK_URL'] ?? 'http://127.0.0.1:8787/api/edit-plan'
 const instruction = process.argv[2] ?? '문서 전체의 문장을 더 간결하고 명확하게 다듬어줘.'
@@ -92,13 +91,14 @@ console.log(`검증코드 일치 ${matched}/${plan.operations.length}`)
 
 // 2. 원문의 들여쓰기가 결과에 남았나.
 const lead = (text: string): string => text.slice(0, text.length - text.trimStart().length)
-let resolved
-try {
-  resolved = resolveEditPlan(plan, paragraphs)
-} catch (error) {
-  if (!(error instanceof PatchError)) throw error
-  console.error(`\n적용하지 않았습니다 — ${error.message}`)
-  for (const issue of error.issues) console.error(`  [${issue.kind}] ${issue.paragraphId}`)
+const { plan: resolved, skipped, recovered } = resolveEditPlan(plan, paragraphs)
+if (recovered > 0) console.log(`검증코드로 대상을 되살린 수정 ${recovered}건`)
+if (skipped.length > 0) {
+  console.log(`건너뛴 수정 ${skipped.length}건 (나머지는 그대로 적용된다)`)
+  for (const item of skipped) console.log(`  [${item.kind}] ${item.paragraphId}`)
+}
+if (resolved.operations.length === 0) {
+  console.error('\n적용할 수정이 남지 않았습니다.')
   process.exit(1)
 }
 let indented = 0
