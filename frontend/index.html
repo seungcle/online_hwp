@@ -42,8 +42,14 @@
     </nav>
   </header>
 
-  <!-- 로그인. AI 호출을 쓸 수 있는 사람만 들어온다. -->
-  <main id="gate" class="landing" hidden>
+  <!--
+    로그인. AI 호출을 쓸 수 있는 사람만 들어온다.
+
+    **처음부터 이 화면이 보이고 아래 업로드 화면은 숨어 있다.** 반대로 두면
+    JS가 실행되기 전까지 업로드 화면이 번쩍이고, JS가 아예 뜨지 않으면 그대로
+    남는다. 기본값이 닫혀 있어야 한다.
+  -->
+  <main id="gate" class="landing">
     <h1 class="landing-title">로그인</h1>
     <p class="landing-sub">
       AI 수정 기능은 발급받은 아이디로만 쓸 수 있습니다.
@@ -62,8 +68,8 @@
     </form>
   </main>
 
-  <!-- 파일을 열기 전 -->
-  <main id="landing" class="landing">
+  <!-- 파일을 열기 전. 로그인을 지나야 열린다. -->
+  <main id="landing" class="landing" hidden>
     <h1 class="landing-title">HWPX 양식은 그대로, 내용만 바꿉니다</h1>
     <p class="landing-sub">
       한글에서 만든 <code>.hwpx</code> 파일을 올리면 표·서식·로고를 유지한 채
